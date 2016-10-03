@@ -1,3 +1,11 @@
+"이 vimrc파일을 쓰려면
+" vim -u vimrc 이렇게 명령어를 실행하라.
+" ~/.vimrc 에 alias를 내용을 추가후 alias를 써도 좋다.
+" alias vim -u ~/vimrc/path/vimrc
+"
+"============ kernel source 경로 ===========
+let kernel_src_home=getcwd()
+
 set nu
 set ai
 set si
@@ -71,10 +79,11 @@ nmap ,0 :b!0<CR>	  " Switch to File Buffer #0
 
 
 "============ ctags, scope 경로 ===========
-set tags+=getpwd() "/tags"
+exe "set tags+=" . kernel_src_home . "/tags"
+exe "cscope add " . kernel_src_home . "/cscope.out"
+
 set csprg=/usr/bin/cscope
 set nocsverb
-cs add getpwd() "/cscope.out"
 set csverb
 set csto=0
 set csre
@@ -172,6 +181,11 @@ vmap <c-c> <esc>:call CmtOn() <cr>
 vmap <c-x> <esc>:call CmtOff() <cr>
 nmap <c-c> v:call CmtOn() <cr>
 nmap <c-x> v:call CmtOff() <cr>
+
+" visual 클립보드 복사
+vmap <F3> "+y
+" 클립보드 내용 붙여 넣기
+nmap <F4> "+p
 
 nmap <F5> :call IC_AnalyzingCode() <cr>
 nmap <F6> :call IC_DailySummary() <cr>

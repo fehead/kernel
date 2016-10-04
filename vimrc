@@ -1,7 +1,7 @@
 "이 vimrc파일을 쓰려면
 " vim -u vimrc 이렇게 명령어를 실행하라.
 " ~/.vimrc 에 alias를 내용을 추가후 alias를 써도 좋다.
-" alias vim -u ~/vimrc/path/vimrc
+" alias "cd ~/kernel/source/path;vim -u vimrc"
 "
 "============ kernel source 경로 ===========
 let kernel_src_home=getcwd()

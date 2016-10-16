@@ -1812,8 +1812,16 @@ void mark_free_pages(struct zone *zone)
  * Free a 0-order page
  * cold == true ? free a cold page : free a hot page
  */
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * free_hot_cold_page(page, false);
+ */
 void free_hot_cold_page(struct page *page, bool cold)
 {
+	/* IAMROOT-12 fehead (2016-10-16):
+	 * --------------------------
+	 * zone = contig_page_data.node_zones[0];
+	 */
 	struct zone *zone = page_zone(page);
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
@@ -3291,6 +3299,10 @@ unsigned long get_zeroed_page(gfp_t gfp_mask)
 }
 EXPORT_SYMBOL(get_zeroed_page);
 
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * #define __free_page(page) __free_pages((page), 0)
+ */
 void __free_pages(struct page *page, unsigned int order)
 {
 

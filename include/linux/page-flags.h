@@ -109,6 +109,10 @@ enum pageflags {
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	PG_compound_lock,
 #endif
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * 라즈베리파이2는 22, 0x16
+ */
 	__NR_PAGEFLAGS,
 
 	/* Filesystems */

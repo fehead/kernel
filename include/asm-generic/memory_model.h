@@ -25,11 +25,20 @@
 /*
  * supports 3 memory models.
  */
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * 라즈베리파이2 용
+ */
 #if defined(CONFIG_FLATMEM)
 
 /* IAMROOT-12AB:
  * -------------
  * pfn으로 mem_map[]에서 해당 page descriptor를 알아온다.
+ */
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * ARCH_PFN_OFFSET = 0 이므로
+ * &mem_map[pfn] 가 될다.
  */
 #define __pfn_to_page(pfn)	(mem_map + ((pfn) - ARCH_PFN_OFFSET))
 

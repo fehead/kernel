@@ -15,6 +15,13 @@
 void foo(void)
 {
 	/* The enum constants to put into include/generated/bounds.h */
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * NR_PAGEFLAGS	22(0x16)
+ * MAX_NR_ZONES 2
+ * NR_CPUS_BITS	2
+ * SPINLOCK_SIZE 4
+ */
 	DEFINE(NR_PAGEFLAGS, __NR_PAGEFLAGS);
 	DEFINE(MAX_NR_ZONES, __MAX_NR_ZONES);
 #ifdef CONFIG_SMP

@@ -381,6 +381,10 @@ enum zone_type {
 	ZONE_HIGHMEM,
 #endif
 	ZONE_MOVABLE,
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * 라즈베리파이는 2
+ */
 	__MAX_NR_ZONES
 };
 
@@ -770,6 +774,10 @@ struct zonelist_cache {
 	unsigned long last_full_zap;		/* when last zap'd (jiffies) */
 };
 #else
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * 라즈베리파이2는 아래를 쓴다.
+ */
 #define MAX_ZONELISTS 1
 struct zonelist_cache;
 #endif
@@ -872,6 +880,7 @@ typedef struct pglist_data {
 /* IAMROOT-12AB:
  * -------------
  * SPARSEMEM이 아닌 모델에서 사용하는 노드별 mem_map(page descriptor들) 
+ * 라즈베리파이2
  */
 	struct page *node_mem_map;
 #ifdef CONFIG_PAGE_EXTENSION

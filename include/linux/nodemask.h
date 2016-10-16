@@ -92,6 +92,10 @@
 #include <linux/bitmap.h>
 #include <linux/numa.h>
 
+/* IAMROOT-12 fehead (2016-10-10):
+ * --------------------------
+ * typedef struct { unsigned long bits[1]; } nodemask_t;
+ */
 typedef struct { DECLARE_BITMAP(bits, MAX_NUMNODES); } nodemask_t;
 extern nodemask_t _unused_nodemask_arg_;
 

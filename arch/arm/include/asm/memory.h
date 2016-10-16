@@ -169,6 +169,10 @@
  * have CONFIG_ARM_PATCH_PHYS_VIRT. Assembly code must always use
  * PLAT_PHYS_OFFSET and not PHYS_OFFSET.
  */
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * PLAT_PHYS_OFFSET = 0
+ */
 #define PLAT_PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
 
 #ifndef __ASSEMBLY__
@@ -416,19 +420,43 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
  * (DTB 등 사용전에는 물리 시작 주소가 빌드 시 결정됨)
  */
 
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * PHYS_OFFSET = 0
+ */
 #define PHYS_OFFSET	PLAT_PHYS_OFFSET
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * 라즈베리파이2가 사용중...
+ * PHYS_PFN_OFFSET = 0
+ */
 #define PHYS_PFN_OFFSET	((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
 
+/* IAMROOT-12D (2016-05-26):
+ * --------------------------
+ * reutrn x - 0x80000000 + 0
+ */
 static inline phys_addr_t __virt_to_phys(unsigned long x)
 {
 	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
 }
 
+/* IAMROOT-12D (2016-05-26):
+ * --------------------------
+ * return x - 0x0 + 0x80000000
+ * ex) x = 0x100
+ *	0x100 - 0 + 0x80000000 = 0x80000100
+ */
 static inline unsigned long __phys_to_virt(phys_addr_t x)
 {
 	return x - PHYS_OFFSET + PAGE_OFFSET;
 }
 
+/* IAMROOT-12D (2016-05-26):
+ * --------------------------
+ * (kaddr - 0x80000000) >> 12  + 0
+ * 페이지 단위(4k)로 나눈 몫 
+ */
 #define virt_to_pfn(kaddr) \
 	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
 	 PHYS_PFN_OFFSET)
@@ -512,6 +540,10 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
  *
  *  virt_to_page(k)	convert a _valid_ virtual address to struct page *
  *  virt_addr_valid(k)	indicates whether a virtual address is valid
+ */
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * 라즈베리파이2는 0
  */
 #define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
 

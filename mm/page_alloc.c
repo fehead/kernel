@@ -127,6 +127,10 @@ unsigned long totalcma_pages __read_mostly;
 unsigned long dirty_balance_reserve __read_mostly;
 
 int percpu_pagelist_fraction;
+/* IAMROOT-12 fehead (2016-10-22):
+ * --------------------------
+ * gfp_allowed_mask = 0x1ffff2f
+ */
 gfp_t gfp_allowed_mask __read_mostly = GFP_BOOT_MASK;
 
 #ifdef CONFIG_PM_SLEEP

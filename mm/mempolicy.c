@@ -1650,10 +1650,18 @@ static struct zonelist *policy_zonelist(gfp_t gfp, struct mempolicy *policy,
 	int nd)
 {
 	switch (policy->mode) {
+/* IAMROOT-12 fehead (2016-10-22):
+ * --------------------------
+ * 선호(PREFERRED)하는 nd(node) 반환.
+ */
 	case MPOL_PREFERRED:
 		if (!(policy->flags & MPOL_F_LOCAL))
 			nd = policy->v.preferred_node;
 		break;
+/* IAMROOT-12 fehead (2016-10-22):
+ * --------------------------
+ * 주어진 nd(node) 반환.
+ */
 	case MPOL_BIND:
 		/*
 		 * Normally, MPOL_BIND allocations are node-local within the

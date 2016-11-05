@@ -2372,6 +2372,10 @@ static nodemask_t *zlc_setup(struct zonelist *zonelist, int alloc_flags)
  * We are low on memory in the second scan, and should leave no stone
  * unturned looking for a free page.
  */
+/* IAMROOT-12 fehead (2016-10-29):
+ * --------------------------
+ * zlc zone을 scan할 가치가 있는가?
+ */
 static int zlc_zone_worth_trying(struct zonelist *zonelist, struct zoneref *z,
 						nodemask_t *allowednodes)
 {
@@ -2527,6 +2531,10 @@ zonelist_scan:
 		if (alloc_flags & ALLOC_FAIR) {
 			if (!zone_local(ac->preferred_zone, zone))
 				break;
+			/* IAMROOT-12 fehead (2016-10-29):
+			 * --------------------------
+			 * deplete : 비우다.
+			 */
 			if (test_bit(ZONE_FAIR_DEPLETED, &zone->flags)) {
 				nr_fair_skipped++;
 				continue;

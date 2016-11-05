@@ -2493,6 +2493,10 @@ static struct cpuset *nearest_hardwall_ancestor(struct cpuset *cs)
  *	GFP_KERNEL   - any node in enclosing hardwalled cpuset ok
  *	GFP_USER     - only nodes in current tasks mems allowed ok.
  */
+/* IAMROOT-12 fehead (2016-10-29):
+ * --------------------------
+ * cgroup cpuset에서 해당 node에 메모리 할당이 가능한지 반환. 1:true, 0:false
+ */
 int __cpuset_node_allowed(int node, gfp_t gfp_mask)
 {
 	struct cpuset *cs;		/* current cpuset ancestors */

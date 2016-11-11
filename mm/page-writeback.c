@@ -295,6 +295,10 @@ void global_dirty_limits(unsigned long *pbackground, unsigned long *pdirty)
  * Returns the maximum number of dirty pages allowed in a zone, based
  * on the zone's dirtyable memory.
  */
+/* IAMROOT-12 fehead (2016-11-05):
+ * --------------------------
+ * zone에서 허용 dirty page의 최대 갯수를 반한합니다.
+ */
 static unsigned long zone_dirty_limit(struct zone *zone)
 {
 	unsigned long zone_memory = zone_dirtyable_memory(zone);

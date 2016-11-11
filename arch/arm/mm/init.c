@@ -147,19 +147,19 @@ static void __init find_limits(unsigned long *min, unsigned long *max_low,
 
 /* IAMROOT-12AB:
  * -------------
- * max_low: lowmem/highmem 경계
+ * max_low: lowmem/highmem 경계, *max_low = 0x3c000
  */
 	*max_low = PFN_DOWN(memblock_get_current_limit());
 
 /* IAMROOT-12AB:
  * -------------
- * min: DRAM의 시작 주소 (memblock.memory.regions[0].base)
+ * min: DRAM의 시작 주소 (memblock.memory.regions[0].base), *min = 0x0
  */
 	*min = PFN_UP(memblock_start_of_DRAM());
 
 /* IAMROOT-12AB:
  * -------------
- * max_high: DRM의 끝 주소 (memblock.memory.region[마지막].base + size)
+ * max_high: DRM의 끝 주소 (memblock.memory.region[마지막].base + size), *max_high = 0x3c000
  */
 	*max_high = PFN_DOWN(memblock_end_of_DRAM());
 }
@@ -448,6 +448,7 @@ void __init bootmem_init(void)
 /* IAMROOT-12AB:
  * -------------
  * DRAM 시작 물리주소, lowmem/highmem 경계 물리주소, DRAM 끝 물리주소
+ * max_low = 0x3c000, min = 0x0 , max_high = 0x3c000
  */
 	find_limits(&min, &max_low, &max_high);
 

@@ -265,7 +265,7 @@ void __init memory_present(int nid, unsigned long start, unsigned long end)
 
 /* IAMROOT-12AB:
  * -------------
- * 섹션 단위로 증가하며 관련 구조 생성
+ * 섹션 단위로 증가하며 관련 구조 생성, PAGES_PER_SECTION : G, 몇백 M 단위,
  */
 	for (pfn = start; pfn < end; pfn += PAGES_PER_SECTION) {
 		unsigned long section = pfn_to_section_nr(pfn);

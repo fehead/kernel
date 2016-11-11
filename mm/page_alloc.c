@@ -2276,6 +2276,12 @@ static bool __zone_watermark_ok(struct zone *z, unsigned int order,
 
 	if (free_pages - free_cma <= min + z->lowmem_reserve[classzone_idx])
 		return false;
+
+	/* IAMROOT-12 fehead (2016-11-05):
+	 * --------------------------
+	 * free_pages 가 min(min water mark) 보다 많아야 할당 할수 있고
+	 * 아래 코드를 실행한다.
+	 */
 	for (o = 0; o < order; o++) {
 		/* At the next order, this order's pages become unavailable */
 		free_pages -= z->free_area[o].nr_free << o;
@@ -2375,7 +2381,7 @@ static nodemask_t *zlc_setup(struct zonelist *zonelist, int alloc_flags)
  */
 /* IAMROOT-12 fehead (2016-10-29):
  * --------------------------
- * zlc zone을 scan할 가치가 있는가?
+ * zlc(zonelist cache)을 scan할 가치가 있는가?
  */
 static int zlc_zone_worth_trying(struct zonelist *zonelist, struct zoneref *z,
 						nodemask_t *allowednodes)
@@ -2574,6 +2580,10 @@ zonelist_scan:
 		 * page was allocated in should have no effect on the
 		 * time the page has in memory before being reclaimed.
 		 */
+/* IAMROOT-12 fehead (2016-11-05):
+ * --------------------------
+ * ALLOC_FAIR 는 Fastpath 에서만 쓰임.
+ */
 		if (alloc_flags & ALLOC_FAIR) {
 
 /* IAMROOT-12:
@@ -3353,6 +3363,13 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 	struct zoneref *preferred_zoneref;
 	struct page *page = NULL;
 	unsigned int cpuset_mems_cookie;
+/* IAMROOT-12 fehead (2016-11-05):
+ * --------------------------
+ * ALLOC_WMARK_LOW : low memory water mark 아래에서 할당을 받아라.
+ * ALLOC_CPUSET : cgrpup 에 적용되어 있다면 해당 cpuset 에 맞게.
+ * ALLOC_FAIR : 되도록이면 fall list zone list가 아닌 지정된 영역에서 할당 받음.
+ * alloc_flags는 Fastpath 일때 쓰이는 flag이다.
+ */
 	int alloc_flags = ALLOC_WMARK_LOW|ALLOC_CPUSET|ALLOC_FAIR;
 	gfp_t alloc_mask; /* The gfp_t that was actually used for allocation */
 
@@ -3458,6 +3475,11 @@ retry_cpuset:
 	alloc_mask = gfp_mask|__GFP_HARDWALL;
 	page = get_page_from_freelist(alloc_mask, order, alloc_flags, &ac);
 	if (unlikely(!page)) {
+		/* IAMROOT-12 fehead (2016-11-05):
+		 * --------------------------
+		 * 빠른 메모리 할당이 실패했을때 여기가 실행됨 메모리 회수,
+		 * 메모리 compaction등을 행하여 메모리를 확보할듯 싶다.
+		 */
 		/*
 		 * Runtime PM, block IO and its error handling path
 		 * can deadlock because I/O on the device might not

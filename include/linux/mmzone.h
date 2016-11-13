@@ -621,6 +621,10 @@ struct zone {
 	 * last failure is tracked with compact_considered.
 	 */
 	unsigned int		compact_considered;
+	/* IAMROOT-12 fehead (2016-11-12):
+	 * --------------------------
+	 * compact 유예 log2 수.(최대 COMPACT_MAX_DEFER_SHIFT 6, --> 2^6 = 64)
+	 */
 	unsigned int		compact_defer_shift;
 	int			compact_order_failed;
 #endif

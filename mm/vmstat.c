@@ -688,10 +688,18 @@ static int __fragmentation_index(unsigned int order, struct contig_page_info *in
 {
 	unsigned long requested = 1UL << order;
 
+	/* IAMROOT-12 fehead (2016-11-12):
+	 * --------------------------
+	 * 할당할 메모리가 없다(0 반환)
+	 */
 	if (!info->free_blocks_total)
 		return 0;
 
 	/* Fragmentation index only makes sense when a request would fail */
+	/* IAMROOT-12 fehead (2016-11-12):
+	 * --------------------------
+	 * 할당할수 있는 메모리가 있다(-1000 리턴)
+	 */
 	if (info->free_blocks_suitable)
 		return -1000;
 
@@ -700,6 +708,12 @@ static int __fragmentation_index(unsigned int order, struct contig_page_info *in
 	 *
 	 * 0 => allocation would fail due to lack of memory
 	 * 1 => allocation would fail due to fragmentation
+	 */
+	/* IAMROOT-12 fehead (2016-11-12):
+	 * --------------------------
+	 * 파편화정도를 반환(1000에 가까우면 파편화가 그만큼 심하고, 0에 가까우
+	 * 면 파편화가 안되어 있고 메모리가 없다.(500 이상이면 메모리 compaction
+	 * 을 진행할수 있는 조건이된다.)
 	 */
 	return 1000 - div_u64( (1000+(div_u64(info->free_pages * 1000ULL, requested))), info->free_blocks_total);
 }

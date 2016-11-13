@@ -150,6 +150,11 @@ void defer_compaction(struct zone *zone, int order)
 }
 
 /* Returns true if compaction should be skipped this time */
+/* IAMROOT-12 fehead (2016-11-12):
+ * --------------------------
+ * return false: compaction를 시도한다.
+ *	true: compaction를 미루어라(유예하라).
+ */
 bool compaction_deferred(struct zone *zone, int order)
 {
 	unsigned long defer_limit = 1UL << zone->compact_defer_shift;
@@ -1234,6 +1239,10 @@ static unsigned long __compaction_suitable(struct zone *zone, int order,
 	 * This is because during migration, copies of pages need to be
 	 * allocated and for a short time, the footprint is higher
 	 */
+	/* IAMROOT-12 fehead (2016-11-12):
+	 * --------------------------
+	 * order의 2배만큼 워터마크를 올리고(더 깐깐하게 처리) order 0을 검사한다.
+	 */
 	watermark += (2UL << order);
 	if (!zone_watermark_ok(zone, 0, watermark, classzone_idx, alloc_flags))
 		return COMPACT_SKIPPED;
@@ -1269,6 +1278,19 @@ unsigned long compaction_suitable(struct zone *zone, int order,
 	return ret;
 }
 
+/* IAMROOT-12 fehead (2016-11-12):
+ * --------------------------
+ * struct compact_control cc = {
+ * 	.nr_freepages = 0,
+ * 	.nr_migratepages = 0,
+ * 	.order = order,
+ * 	.gfp_mask = gfp_mask,
+ * 	.zone = zone,
+ * 	.mode = mode,
+ * 	.alloc_flags = alloc_flags,
+ * 	.classzone_idx = classzone_idx,
+ * };
+ */
 static int compact_zone(struct zone *zone, struct compact_control *cc)
 {
 	int ret;

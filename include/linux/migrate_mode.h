@@ -8,6 +8,11 @@
  * MIGRATE_SYNC will block when migrating pages
  */
 enum migrate_mode {
+/* IAMROOT-12 fehead (2016-11-12):
+ * --------------------------
+ * MIGRATE_ASYNC 이주할때 나중에 동기화 메커니즘이 돌아간다.
+ * MIGRATE_SYNC 이주(MIGRATE)할때 당장 동기화 메커니즘을 동작시킨다.
+ */
 	MIGRATE_ASYNC,
 	MIGRATE_SYNC_LIGHT,
 	MIGRATE_SYNC,

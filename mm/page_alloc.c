@@ -2332,6 +2332,11 @@ bool zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 					zone_page_state(z, NR_FREE_PAGES));
 }
 
+/* IAMROOT-12 fehead (2016-11-12):
+ * --------------------------
+ * 정밀도를 높이기위해 각 cpu별로 저장되어 있는 freepage 개수를 모두 더해 
+ * free page개수를 구한다음 watermark 체크를 한다.
+ */
 bool zone_watermark_ok_safe(struct zone *z, unsigned int order,
 			unsigned long mark, int classzone_idx, int alloc_flags)
 {
@@ -3299,6 +3304,10 @@ retry:
 		ac->classzone_idx = zonelist_zone_idx(preferred_zoneref);
 	}
 
+/* IAMROOT-12 fehead (2016-11-12):
+ * --------------------------
+ * fastpath에서 한번 시도하고 여기서 두번째 호출
+ */
 	/* This is the last chance, in general, before the goto nopage. */
 	page = get_page_from_freelist(gfp_mask, order,
 				alloc_flags & ~ALLOC_NO_WATERMARKS, ac);
@@ -5998,6 +6007,11 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 	pgdat->numabalancing_migrate_nr_pages = 0;
 	pgdat->numabalancing_migrate_next_window = jiffies;
 #endif
+/* IAMROOT-12 fehead (2016-11-12):
+ * --------------------------
+ * kswapd_wait : 메모리 회수 데몬
+ * pfmemalloc_wait : 비상 메모리 할당 데몬.
+ */
 	init_waitqueue_head(&pgdat->kswapd_wait);
 	init_waitqueue_head(&pgdat->pfmemalloc_wait);
 
@@ -6135,6 +6149,7 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 /* IAMROOT-12AB:
  * -------------
  * zone->lruvec를 초기화한다.
+ * lruvec 아마 유저태스크에서 메모리가 회수 가능한 것들만 가지고 있을것이다.
  */
 		lruvec_init(&zone->lruvec);
 		if (!size)

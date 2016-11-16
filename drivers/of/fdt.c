@@ -568,6 +568,18 @@ void of_fdt_unflatten_tree(unsigned long *blob,
 EXPORT_SYMBOL_GPL(of_fdt_unflatten_tree);
 
 /* Everything below here references initial_boot_params directly. */
+/* IAMROOT-12CD (2016-06-17):
+ * --------------------------
+ * dt_root_size_cells = \ { #address-cells }	= 1
+ * dt_root_addr_cells = \ { #size-cells }	= 1
+ *
+ * arch/arm/boot/dts/skeleton.dtsi
+ * / {
+ *	#address-cells = <1>;
+ *	#size-cells = <1>;
+ *	...
+ * };
+ */
 int __initdata dt_root_addr_cells;
 int __initdata dt_root_size_cells;
 
@@ -1197,6 +1209,18 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
  * ------------
  * linux,usable-memory 또는 reg 속성을 읽어오는데 없으면 리턴한다.
  */
+	/* IAMROOT-12CD (2016-06-25):
+	 * --------------------------
+	 * reg 는 아래의 "reg = <0 0x3c000000>" 값으로 설정 된다.
+	 * / {
+	 *	#address-cells = <1>;
+	 *	#size-cells = <1>;
+	 *	chosen { };
+	 *	aliases { };
+	 *	memory { device_type = "memory"; reg = <0 0x3c000000>; };
+	 * };
+	 * 0x3c000000 : 980Mb	uboot가 설정한듯함.
+	 */
 	reg = of_get_flat_dt_prop(node, "linux,usable-memory", &l);
 	if (reg == NULL)
 		reg = of_get_flat_dt_prop(node, "reg", &l);
@@ -1246,6 +1270,11 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
  *
  * l은 reg에서 사용된 바이트 수
  */
+	/* IAMROOT-12CD (2016-07-02):
+	 * --------------------------
+	 * 라즈베리파이 2의 경우 reg = <0 0x3c000000> 이기 때문에
+	 * (l / sizeof(__be32)) 값은 2이기 때문에 l = 8
+	 */
 	endp = reg + (l / sizeof(__be32));
 
 	pr_debug("memory scan node %s, reg size %d, data: %x %x %x %x,\n",
@@ -1280,6 +1309,11 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
  *      아키텍처별로 또한 단계별로 약간씩 다르지만 현재 ARM은 
  *	리눅스 추세대로 이 곳에서 memblock을 사용한다. 
  */
+		/* IAMROOT-12 fehead (2016-11-16):
+		 * --------------------------
+		 * 라즈베리파이2
+		 * base:0, size:0x3c000000 - 980Mb
+		 */
 		early_init_dt_add_memory_arch(base, size);
 	}
 

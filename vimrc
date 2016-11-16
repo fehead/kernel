@@ -1,7 +1,7 @@
 "이 vimrc파일을 쓰려면
 " vim -u vimrc 이렇게 명령어를 실행하라.
 " ~/.vimrc 에 alias를 내용을 추가후 alias를 써도 좋다.
-" alias "cd ~/kernel/source/path;vim -u vimrc"
+" alias via="cd ~/kernel/source/path;vim -u vimrc"
 "
 "============ kernel source 경로 ===========
 let kernel_src_home=getcwd()
@@ -30,7 +30,7 @@ set ls=2	"last statusbar
 syntax on
 set cc=80	" 80라인 컬럼 표시
 
-set dy+=lastline
+" set dy+=lastline
 " set formatoptions+=r    " 주석 자동 처리
 " setlocal comments-=://  " // 자동 주석 제거
 colorscheme ron
@@ -190,7 +190,7 @@ nmap <F4> "+p
 nmap <F5> :call IC_AnalyzingCode() <cr>
 nmap <F6> :call IC_DailySummary() <cr>
 nmap <F7> :call IC_FileSummary() <cr>
-nmap <F8> A<tab>/* IAMROOT-12D: 
+nmap <F8> A<tab>/* IAMROOT-12: 
 
 " 커널분석용 설정
 nmap <F9> :set ts=8 sw=8 sts=8 <cr>

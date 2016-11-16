@@ -66,6 +66,10 @@ pmdval_t user_pmd_table = _PAGE_USER_TABLE;
  * -------------
  * rpi2: CPOLICY_WRITEALLOC
  */
+/* IAMROOT-12D (2016-05-25):
+ * --------------------------
+ * 라즈베리 파이2는 cachepolicy = 4;	// CPOLICY_WRITEALLOC
+ */
 static unsigned int cachepolicy __initdata = CPOLICY_WRITEBACK;
 static unsigned int ecc_mask __initdata = 0;
 pgprot_t pgprot_user;
@@ -149,6 +153,11 @@ static unsigned long initial_pmd_value __initdata = 0;
  * assembly code, which avoids an illegal state where the TLBs can get
  * confused.  See comments in early_cachepolicy() for more information.
  */
+/* IAMROOT-12D (2016-05-25):
+ * --------------------------
+ * cmd = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | PMD_SECT_AF |
+ *	| PMD_SECT_WBWA|PMD_SECT_S;
+ */
 void __init init_default_cache_policy(unsigned long pmd)
 {
 	int i;
@@ -168,7 +177,7 @@ void __init init_default_cache_policy(unsigned long pmd)
 
 	for (i = 0; i < ARRAY_SIZE(cache_policies); i++)
 		if (cache_policies[i].pmd == pmd) {
-			cachepolicy = i;
+			cachepolicy = i;	/* IAMROOT-12D : 4 */
 			break;
 		}
 
@@ -1950,6 +1959,10 @@ void __init early_paging_init(const struct machine_desc *mdesc,
 
 #else
 
+/* IAMROOT-12CD (2016-07-23):
+ * --------------------------
+ * pi2에서는 mdesc->init_meminfo 값이 NULL 이다.
+ */
 void __init early_paging_init(const struct machine_desc *mdesc,
 			      struct proc_info_list *procinfo)
 {

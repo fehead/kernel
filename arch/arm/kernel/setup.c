@@ -83,8 +83,21 @@ extern void setup_dma_zone(const struct machine_desc *desc);
 
 unsigned int processor_id;
 EXPORT_SYMBOL(processor_id);
+/* IAMROOT-12CD (2016-07-02):
+ * --------------------------
+ * __machine_arch_type = MACH_TYPE_BCM_2709
+ */
 unsigned int __machine_arch_type __read_mostly;
 EXPORT_SYMBOL(__machine_arch_type);
+/* IAMROOT-12D (2016-05-25):
+ * --------------------------
+ * cacheid = CACHEID_VIPT_NONALIASING | CACHEID_VIPT_I_ALIASING  = 0x12
+ *
+ * L1 i-cache의 타입은 CACHEID_VIPT_I_ALIASING
+ * cacheid에 d-cache + i-cache 플래그들의 특성을 담는다.
+ *		CACHEID_VIPT_NONALIASING(b1) | CACHEID_VIPT_I_ALIASING(b4)
+ *	cacheid = 0x12
+ */
 unsigned int cacheid __read_mostly;
 EXPORT_SYMBOL(cacheid);
 
@@ -99,6 +112,13 @@ EXPORT_SYMBOL(system_serial_low);
 unsigned int system_serial_high;
 EXPORT_SYMBOL(system_serial_high);
 
+/* IAMROOT-12D (2016-05-25):
+ * --------------------------
+ * elf_hwcap = HWCAP_HALF | HWCAP_THUMB | HWCAP_FAST_MULT |
+ *		HWCAP_EDSP | HWCAP_TLS | HWCAP_IDIVA | HWCAP_LPAE;
+ *	HWCAP_SWP 는 elf_hwcap_fixup() 함수에서 제거됨.
+ * h/w capability
+ */
 unsigned int elf_hwcap __read_mostly;
 EXPORT_SYMBOL(elf_hwcap);
 
@@ -113,16 +133,46 @@ EXPORT_SYMBOL(elf_hwcap2);
  * MULTI_CPU로 정의된 아키텍처들은 아래의 전역변수에 
  * 각종 구조체가 연결되어 있다.
  */
-
+/* IAMROOT-12D (2016-05-25):
+ * --------------------------
+ *  - proc  :	process 초기화 관련 함수 목록(arch/arm/mm/proc-macros.S 참고
+ *	v7_early_abort, v7_pabort, cpu_v7_proc_init, cpu_v7_proc_fin
+ *	, cpu_v7_reset, cpu_v7_do_idle, cpu_v7_dcache_clean_area
+ *	, cpu_v7_switch_mm, cpu_v7_set_pte_ext, cpu_v7_suspend_size등의 함수
+ * 
+ */
 struct processor processor __read_mostly;
 #endif
 #ifdef MULTI_TLB
+/* IAMROOT-12D (2016-05-25):
+ * --------------------------
+ *  - tlb   :	tlb table flush 관련 함수 목록 arch/arm/mm/tlb-v7.S 참고
+ *	v7wbi_flush_kern_tlb_range, v7wbi_tlb_flags_smp, v7wbi_tlb_flags_up
+ */
 struct cpu_tlb_fns cpu_tlb __read_mostly;
 #endif
 #ifdef MULTI_USER
+/* IAMROOT-12D (2016-05-25):
+ * --------------------------
+ * clear page, or copy page(??)
+ *	struct cpu_user_fns	*user = v6_user_fns;
+ *
+ * struct cpu_user_fns v6_user_fns __initdata = {
+ *		.cpu_clear_user_highpage = v6_clear_user_highpage_nonaliasing,
+ *	.cpu_copy_user_highpage	= v6_copy_user_highpage_nonaliasing,
+ * };
+ */
 struct cpu_user_fns cpu_user __read_mostly;
 #endif
 #ifdef MULTI_CACHE
+/* IAMROOT-12D (2016-05-25):
+ * --------------------------
+ * arch/arm/mm/cache-v7.S 참고
+ *   v7_flush_icache_all, v7_flush_kern_cache_all, v7_flush_kern_cache_louis,
+ *   v7_flush_user_cache_all, v7_flush_user_cache_range, v7_coherent_kern_range,
+ *   v7_coherent_user_range, v7_flush_kern_dcache_area, v7_dma_map_area,
+ *   v7_dma_unmap_area, v7_dma_flush_range
+ */
 struct cpu_cache_fns cpu_cache __read_mostly;
 #endif
 #ifdef CONFIG_OUTER_CACHE
@@ -167,9 +217,41 @@ static struct stack stacks[NR_CPUS];
 char elf_platform[ELF_PLATFORM_SIZE];
 EXPORT_SYMBOL(elf_platform);
 
+/* IAMROOT-12D (2016-11-16):
+ * --------------------------
+ * cpu_name = "ARMv7 Processor";
+ */
 static const char *cpu_name;
+/* IAMROOT-12D (2016-06-09):
+ * --------------------------
+ * machine_name = "BCM_2709"
+ */
 static const char *machine_name;
+/* IAMROOT-12 fehead (2016-11-16):
+ * --------------------------
+ * "rw earlyprintk loglevel=8 console=ttyAMA0,115200 console=tty1 dwc_otg.lpm_enable=0 root=/dev/mmcblk0p2"
+ */
 static char __initdata cmd_line[COMMAND_LINE_SIZE];
+/* IAMROOT-12D (2016-06-09):
+ * --------------------------
+ * arch/arm/mach-bcm2709/bcm2709.c
+ * 
+ * static const struct machine_desc __mach_desc_BCM_2709
+ * _used
+ *  __attribute__((__section__(".arch.info.init"))) = {
+ *		.nr     = MACH_TYPE_BCM_2709
+ *		.name   = "BCM_2709",
+ *		.smp		= smp_ops(bcm2709_smp_ops),
+ *		.map_io = bcm2709_map_io,
+ *		.init_irq = bcm2709_init_irq,
+ *		.init_time = bcm2709_timer_init,
+ *		.init_machine = bcm2709_init,
+ *		.init_early = bcm2709_init_early,
+ *		.reserve = board_reserve,
+ *		.restart	= bcm2709_restart,
+ *		.dt_compat = bcm2709_compat,
+ * };
+ */
 const struct machine_desc *machine_desc __initdata;
 
 static union { char c[4]; unsigned long l; } endian_test __initdata = { { 'l', '?', '?', 'b' } };
@@ -363,8 +445,16 @@ static int cpu_has_aliasing_icache(unsigned int arch)
 	return aliasing_icache;
 }
 
+/* IAMROOT-12A:
+ * ------------
+ * 전역 변수 cacheid에 L1 cache 타입 설정
+ */
 static void __init cacheid_init(void)
 {
+	/* IAMROOT-12D (2016-05-25):
+	 * --------------------------
+	 * CPU_ARCH_ARMv7; // 9
+	 */
 	unsigned int arch = cpu_architecture();
 
 	if (arch == CPU_ARCH_ARMv7M) {
@@ -380,7 +470,17 @@ static void __init cacheid_init(void)
  * CTR.L1IP(L1 instruction cache policy)
  *	값이 2인 경우는 i-cache 관련하여 VIPT
  */
-
+		/* IAMROOT-12D (2016-05-25):
+		 * --------------------------
+		 * cachetype = 0x84448003
+		 * [31:29] Format :	Indicates the CTR format:
+		 *	0x4	ARMv7 format.
+		 *
+		 * [15:14] L1Ip : L1 instruction cache policy. Indicates the
+		 *		indexing and tagging policy for the L1
+		 *		instruction cache:
+		 *	0b10	Virtually Indexed Physically Tagged (VIPT).
+		 */
 		unsigned int cachetype = read_cpuid_cachetype();
 		if ((cachetype & (7 << 29)) == 4 << 29) {
 			/* ARMv7 register format */
@@ -457,6 +557,13 @@ void __init early_print(const char *str, ...)
 	printk("%s", buf);
 }
 
+/* IAMROOT-12D (2016-05-21):
+ * --------------------------
+ * TODO : isar5는 무엇인가?
+ *  v8 Crypto 명령어 셋 정보이며 라즈베리파이는 지원하지 않음.
+ * 
+ * 반환 : elf_hwcap |= (HWCAP_IDIVA | HWCAP_LPAE)
+ */
 static void __init cpuid_init_hwcaps(void)
 {
 	unsigned int divide_instrs, vmsa;
@@ -473,12 +580,18 @@ static void __init cpuid_init_hwcaps(void)
  *	1=Thumb에서 SDIV/UDIV 명령 지원 (IDIVT: Instruction DIV for Thumb)
  *	2=ARM에서 SDIV/UDIV 명령 지원   (IDIVA: Instruction DIV for ARM)
  */
-
+	/* IAMROOT-12D (2016-05-25):
+	 * --------------------------
+	 * Read Instruction Set Attribute Register 0
+	 *	MRC p15, 0, r0, c0, c2, 0 --> 0x02101110
+	 *  24~27번 비트는 나누기 명령어 셋 지원 여부를 가르키며 라즈베리파이2는
+	 *  0x2 이며 SDIV and UDIV Thumb, ARM 명령어 셋을 지원한다.
+	 */
 	divide_instrs = (read_cpuid_ext(CPUID_EXT_ISAR0) & 0x0f000000) >> 24;
 
 	switch (divide_instrs) {
 	case 2:
-		elf_hwcap |= HWCAP_IDIVA;
+		elf_hwcap |= HWCAP_IDIVA;/* IAMROOT-12D : 라즈베리 파이2 */
 	case 1:
 		elf_hwcap |= HWCAP_IDIVT;
 	}
@@ -487,16 +600,27 @@ static void __init cpuid_init_hwcaps(void)
  * ------------
  * 라즈베리파이2는 LPAE를 사용하지는 않지만 칩은 지원함.
  */
-
+	/* IAMROOT-12D (2016-05-25):
+	 * --------------------------
+	 * Read Memory Model Feature Register 0
+	 *  MRC p15, 0, r0, c0, c1, 4 --> 0x10101105
+	 *  0~3비트는 VMSA(Virtual Memory System Architecture)지원 여부를 나타낸
+	 *  다.
+	 */
 	/* LPAE implies atomic ldrd/strd instructions */
 	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
 	if (vmsa >= 5)
-		elf_hwcap |= HWCAP_LPAE;
+		elf_hwcap |= HWCAP_LPAE;	/* IAMROOT-12D : 라즈베리 파이2 */
 }
 
+/* IAMROOT-12D (2016-05-28):
+ * --------------------------
+ * 라즈베리파이2는 HWCAP_SWP 명령어를 제외한다.
+ *  (ldrex, strex 명령어-atomic 메모리 접근 ARM 명령어-가 있기때문에)
+ */
 static void __init elf_hwcap_fixup(void)
 {
-	unsigned id = read_cpuid_id();
+	unsigned id = read_cpuid_id();	/* IAMROOT-12D : 0x410FC075 */
 	unsigned sync_prim;
 
 	/*
@@ -510,7 +634,11 @@ static void __init elf_hwcap_fixup(void)
  * 아래의 루틴같이 ARM1136 r1p0에서 MIDR.variant = 0인 경우 
  * TLS 기능이 없다고 판단하면 뒤 루틴을 생략하고 빠져나간다. 
  */
-
+	/* IAMROOT-12D (2016-05-25):
+	 * --------------------------
+	 * read_cpuid_part() = 0x410FC075 & 0xff00fff0
+	 * #define ARM_CPU_PART_ARM1136	0x4100b360
+	 */
 	if (read_cpuid_part() == ARM_CPU_PART_ARM1136 &&
 	    ((id >> 20) & 3) == 0) {
 		elf_hwcap &= ~HWCAP_TLS;
@@ -523,7 +651,10 @@ static void __init elf_hwcap_fixup(void)
  * SWP를 제거할 필요가 있는 경우는 ARMv7 부터이다.
  * ARMv7에서는 SWP를 대체할 수 있는 LDREX/STREX를 사용한다.
  */
-
+	/* IAMROOT-12D (2016-05-25):
+	 * --------------------------
+	 * 0x410FC075 & 0x000f0000 
+	 */
 	/* Verify if CPUID scheme is implemented */
 	if ((id & 0x000f0000) != 0x000f0000)
 		return;
@@ -532,6 +663,17 @@ static void __init elf_hwcap_fixup(void)
 	 * If the CPU supports LDREX/STREX and LDREXB/STREXB,
 	 * avoid advertising SWP; it may not be atomic with
 	 * multiprocessing cores.
+	 */
+	/* IAMROOT-12D (2016-05-25):
+	 * --------------------------
+	 * ISAR3 : Instruction Set Attribute Register 3
+	 * 프로세서가 기본적으로 제공하는 명령어 셋 정보를 제공한다.
+	 *
+	 *  MRC p15, 0, r0, c0, c2, 3 --> 0x11112131
+	 *  [15:12] SynchPrim_instrs 동기화 명령어 셋 지원 여부(라즈베리파이2는
+	 *	0x02로 ldrex, strex, clrex, ldrexb, ldrexh, strexb, strexh,
+	 *	ldrexd, strexd 명령어를 지원 함)
+	 *  [23:20] ThumbCopy_instrs thumb move 명령어 지원 여부.
 	 */
 	sync_prim = ((read_cpuid_ext(CPUID_EXT_ISAR3) >> 8) & 0xf0) |
 		    ((read_cpuid_ext(CPUID_EXT_ISAR4) >> 20) & 0x0f);
@@ -580,6 +722,11 @@ void notrace cpu_init(void)
  *	MULTI_CPU가 동작 중이어서 processor._proc_init()를 호출하는데 
  *	이 변수에는 cpu_v7_proc_init의 주소가 담김 (../mm/proc-v7.S)
  */
+	/* IAMROOT-12D (2016-05-26):
+	 * --------------------------
+	 * cpu_proc_init 함수는 cpu_v7_proc_init를 호출하며
+	 *  cpu_v7_proc_init 함수는 그냥 아무것도 하지 않고 리턴함
+	 */
 	cpu_proc_init();
 
 	/*
@@ -589,7 +736,7 @@ void notrace cpu_init(void)
 #ifdef CONFIG_THUMB2_KERNEL
 #define PLC	"r"
 #else
-#define PLC	"I"
+#define PLC	"I"	/* IAMROOT-12D : 라즈베리파2 */
 #endif
 
 	/*
@@ -604,6 +751,15 @@ void notrace cpu_init(void)
  * 2) 순서대로 ABT_MODE, UND_MODE, FIQ_MODE에 대한 스택 설정.
  * 3) 마지막으로 다시 SVC_MODE로 돌아온다.
  */
+	/* IAMROOT-12D (2016-05-26):
+	 * --------------------------
+	 * 1. IRQ_MODE 스택설정
+	 *    인터럽트 disable + IRQ_MODE 진입후 sp를 stack[0].irq[0]주소로 설정
+	 * 2. ABT_MODE 스택설정
+	 *    인터럽트 disable + ABT_MODE 진입후 sp를 stack.abt[0]주소로 설정
+	 * 3. UND_MODE, FIQ_MODE 각각 sp 설정
+	 * 4. SVC_MODE로 복귀.
+	 */
 	__asm__ (
 	"msr	cpsr_c, %1\n\t"
 	"add	r14, %0, %2\n\t"
@@ -807,6 +963,31 @@ static void __init smp_build_mpidr_hash(void)
 }
 #endif
 
+/* IAMROOT-12D (2016-05-21):
+ * --------------------------
+ * Start_kernel 이전 시점에 우리는 proc_info_list정보를 모두 담아왔다.
+ * 이미 담겨져 있는 정보를 우리는 lookup_processor_type()을 통해 가져온다.
+ * --------------------------
+ * 참고 사항 : arch/arm/mm/proc-v7.S
+ * struct proc_info_list {
+ *	unsigned int	cpu_val = 0x000f0000;
+ *	unsigned int	cpu_mask = 0x000f0000;
+ *	unsigned long	__cpu_mm_mmu_flags = PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
+ *				PMD_SECT_AP_READ | PMD_SECT_AF | PMD_FLAGS_SMP;
+ *	unsigned long	__cpu_io_mmu_flags = PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
+ *				PMD_SECT_AP_READ | PMD_SECT_AF;
+ *	unsigned long	__cpu_flush = __v7_setup;	// arch/arm/mm/proc-v7.S
+ *		const char		*arch_name = "armv7";
+ *	const char		*elf_name = "v7";
+ *	unsigned int	elf_hwcap = HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB |
+ *				HWCAP_FAST_MULT | HWCAP_EDSP | HWCAP_TLS;
+ *	const char		*cpu_name = "ARMv7 Processor";
+ *	struct processor	*proc = v7_processor_functions;
+ *	struct cpu_tlb_fns	*tlb = v7wbi_tlb_fns;
+ *	struct cpu_user_fns	*user = v6_user_fns;
+ *		struct cpu_cache_fns	*cache = v7_cache_fns;
+ * };
+ */
 static void __init setup_processor(void)
 {
 	struct proc_info_list *list;
@@ -831,6 +1012,11 @@ static void __init setup_processor(void)
  *	__cpu_architecture = CPU_ARCH_ARMv7(9)
  */
 
+	/* IAMROOT-12D (2016-05-24):
+	 * --------------------------
+	 *	cpu_name = "ARMv7 Processor";
+	 *	__cpu_architecture = CPU_ARCH_ARMv7
+	 */
 	cpu_name = list->cpu_name;
 
 	__cpu_architecture = __get_cpu_architecture();
@@ -887,6 +1073,12 @@ static void __init setup_processor(void)
  * -----------------------------------------------------------------------
  *	HWCAP_HALF | HWCAP_FAST_MULT | HWCAP_EDSP | HWCAP_TLS | HWCPA_IDIVA
  */
+	/* IAMROOT-12D (2016-05-25):
+	 * --------------------------
+	 * list->elf_hwcap = HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB |
+	 *		HWCAP_FAST_MULT | HWCAP_EDSP | HWCAP_TLS;
+	 * h/w capability
+	 */
 	elf_hwcap = list->elf_hwcap;
 
 	cpuid_init_hwcaps();
@@ -1279,6 +1471,12 @@ void __init setup_arch(char **cmdline_p)
 	machine_name = mdesc->name;
 	dump_stack_set_arch_desc("%s", mdesc->name);
 
+	/* IAMROOT-12D (2016-06-09):
+	 * --------------------------
+	 * default : REBOOT_COLD = 0,
+	 * reboot_mode 초기값은 REBOOT_HARD reboot.c 참고
+	 * reboot_mode = REBOOT_COLD;
+	 */
 	if (mdesc->reboot_mode != REBOOT_HARD)
 		reboot_mode = mdesc->reboot_mode;
 
@@ -1304,6 +1502,12 @@ void __init setup_arch(char **cmdline_p)
  *	- uart_setup_earlycon()
  *	- uart8250_setup_earlycon()
  */
+	/* IAMROOT-12CD (2016-07-23):
+	 * --------------------------
+	 * rpi2:
+	 *  - setup_of_earlycon() : 여기까지 호출되나 결국 아무것도 하지 않고
+	 *	넘어간다.
+	 */
 	parse_early_param();
 
 	early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));

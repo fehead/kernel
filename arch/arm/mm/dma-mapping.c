@@ -410,6 +410,14 @@ void __init dma_contiguous_early_fixup(phys_addr_t base, unsigned long size)
 void __init dma_contiguous_remap(void)
 {
 	int i;
+	/* IAMROOT-12D (2016-10-04):
+	 * --------------------------
+	 * dma_mmu_remap_num = 1 
+	 * dma_mmu_remap = {
+	 *  [0] = {base = 0x3b800000(952M), size = 0x800000(8M)},	cma 영역.
+	 *	cma 영역 0~8M(원래 5M지만 4M alignment 처리하여 8M가 됨)
+	 *  [1] = {base = 0, size = 0},
+	 */
 	for (i = 0; i < dma_mmu_remap_num; i++) {
 		phys_addr_t start = dma_mmu_remap[i].base;
 		phys_addr_t end = start + dma_mmu_remap[i].size;
@@ -420,6 +428,10 @@ void __init dma_contiguous_remap(void)
  * -------------
  * DMA buffer용도로 사용되는 메모리는 highmem에서 사용할 수 없다.
  */
+		/* IAMROOT-12D (2016-10-04):
+		 * --------------------------
+		 * arm_lowmem_limit: 0x3c000000(960mb)
+		 */
 		if (end > arm_lowmem_limit)
 			end = arm_lowmem_limit;
 		if (start >= end)
@@ -429,6 +441,13 @@ void __init dma_contiguous_remap(void)
  * -------------
  * DMA device가 사용하는 RAM buffer에 대한 타입으로 MT_MEMORY_DMA_READY 사용
  */
+		/* IAMROOT-12D (2016-10-04):
+		 * --------------------------
+		 * map.pfn = 0x3b800
+		 * map.virtual = 0xbb800000
+		 * map.length = 0x800000
+		 * map.type = MT_MEMORY_DMA_READY
+		 */
 		map.pfn = __phys_to_pfn(start);
 		map.virtual = __phys_to_virt(start);
 		map.length = end - start;

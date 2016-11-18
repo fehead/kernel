@@ -1137,6 +1137,14 @@ static struct vm_struct *vmlist __initdata;
  *
  * DO NOT USE THIS FUNCTION UNLESS YOU KNOW WHAT YOU'RE DOING.
  */
+/* IAMROOT-12 fehead (2016-11-18):
+ * --------------------------
+ * 이 함수는 vmalloc_init()가 호출되기 전에 고정 커널 커널 영역을 vmlist에 추가
+ * 하는 데 사용됩니다. @vm->addr, @vm->size 및 @vm->flags는 적절한 값을 포함하고
+ * 다른 필드는 0이어야합니다.  
+ *
+ * 자신이 무엇을하고 있는지 알지 못한다면이 기능을 사용하지 마십시오.
+ */
 void __init vm_area_add_early(struct vm_struct *vm)
 {
 	struct vm_struct *tmp, **p;

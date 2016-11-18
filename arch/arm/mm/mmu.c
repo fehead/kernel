@@ -830,6 +830,20 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
 	} while (pte++, addr += PAGE_SIZE, addr != end);
 }
 
+/* IAMROOT-12CD (2016-10-03):
+ * --------------------------
+ * page table(0x8000_4000 ~ 0x8000_8000에 매핑할 하드웨어 주소와 메모리 속성을
+ * 설정한다.
+ *
+ * type = &mem_types[MT_MEMORY_RWX]
+ *  pmd		addr		end		phys		*pmd
+ *  0x80006000	0x80000000	0x80200000	0		0 | prot_sect
+ *  0x80006004	0x80100000			0x100000	0x100000 | ..
+ *
+ *  0x80006008	0x80200000	0x80400000	0x200000	0x200000 | ..
+ *  0x8000600c	0x80300000			0x300000	0x300000 | ..
+ *
+ */
 static void __init __map_init_section(pmd_t *pmd, unsigned long addr,
 			unsigned long end, phys_addr_t phys,
 			const struct mem_type *type)
@@ -845,6 +859,15 @@ static void __init __map_init_section(pmd_t *pmd, unsigned long addr,
 	 * L1 entries (1MB). Hence increment to get the correct
 	 * offset for odd 1MB sections.
 	 * (See arch/arm/include/asm/pgtable-2level.h)
+	 */
+	/* IAMROOT-12CD (2016-10-03):
+	 * --------------------------
+	 * 클래식 MMU 형식에서는 puds와 pmds가 pgds에 들어갑니다. pmd_offset은
+	 * PGD 항목을 제공합니다. PGD는 L2 테이블 (2MB)에 대한 하나의 논리 포인
+	 * 터를 구성하는 L1 항목 그룹을 나타내며, 여기서 PMD는 개별 L1 항목
+	 * (1MB)을 나타냅니다. 따라서 이상한 1MB 섹션에 대해 올바른 오프셋을 얻
+	 * 기 위해 증가시킵니다.
+	 * SECTION_SIZE = (1UL << SECTION_SHIFT) = 0x100000
 	 */
 	if (addr & SECTION_SIZE)
 		pmd++;
@@ -878,10 +901,26 @@ static void __init __map_init_section(pmd_t *pmd, unsigned long addr,
 	flush_pmd_entry(p);
 }
 
+/* IAMROOT-12CD (2016-10-03):
+ * --------------------------
+ * page table(pgd or pte)에 해당 주소와 주소속성값을 설정한다.
+ * 
+ * pgd 0x80006000, addr=0x80000000, end = 0x80200000, phys = 0
+ * type = &mem_types[MT_MEMORY_RWX]
+ *  pud		addr		end		phys
+ *  0x80006000	0x80000000	0x80200000	0
+ *  0x80006008	0x80200000	0x80400000	0x200000
+ *  0x8000600c	0x80600000	0x80600000	0x400000
+ *  ...
+ */
 static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
 				      unsigned long end, phys_addr_t phys,
 				      const struct mem_type *type)
 {
+	/* IAMROOT-12CD (2016-10-03):
+	 * --------------------------
+	 * pmd = pud
+	 */
 	pmd_t *pmd = pmd_offset(pud, addr);
 	unsigned long next;
 
@@ -915,6 +954,10 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
 		 * With LPAE, we must loop over to map
 		 * all the pmds for the given range.
 		 */
+		/* IAMROOT-12CD (2016-10-03):
+		 * --------------------------
+		 * next = end
+		 */
 		next = pmd_addr_end(addr, end);
 
 		/*
@@ -940,10 +983,27 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
 	} while (pmd++, addr = next, addr != end);
 }
 
+/* IAMROOT-12CD (2016-10-03):
+ * --------------------------
+ * pgd 0x80006000, addr=0x80000000, end = 0x80200000, phys = 0
+ * type = &mem_types[MT_MEMORY_RWX]
+ * 
+ * pgd		addr		end		phys
+ * 0x80006000	0x80000000	0x80200000	0
+ * 0x80006008	0x80200000	0x80400000	0x200000
+ * 0x8000600c	0x80400000	0x80600000	0x400000
+ * 0x80006010	0x80600000	0x80800000	0x600000
+ * 0x80006018	0x80800000	0x80c00000	0x800000
+ * 0x8000601c	0x80900000	0x81000000	0x1000000
+ */
 static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
 				  unsigned long end, phys_addr_t phys,
 				  const struct mem_type *type)
 {
+	/* IAMROOT-12CD (2016-10-03):
+	 * --------------------------
+	 * pud = 0x80006000
+	 */
 	pud_t *pud = pud_offset(pgd, addr);
 	unsigned long next;
 
@@ -967,6 +1027,10 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
  * --> alloc_init_pmd(0x8000_6010, 0x8040_0000, 0x8050_0000, 0x1030_0000,
  */
 	do {
+		/* IAMROOT-12CD (2016-10-03):
+		 * --------------------------
+		 * next = end
+		 */
 		next = pud_addr_end(addr, end);
 		alloc_init_pmd(pud, addr, next, phys, type);
 		phys += next - addr;
@@ -1039,6 +1103,18 @@ static void __init create_36bit_mapping(struct map_desc *md,
  * offsets, and we take full advantage of sections and
  * supersections.
  */
+/* IAMROOT-12CD (2016-09-24):
+ * --------------------------
+ * `md '에 의해 지정된 매핑을 위해 페이지 디렉토리 엔트리와 필요한 페이지 테이블
+ * 을 생성하십시오. 우리는 다양한 크기와 주소 오프셋에 대처할 수 있으며 섹션과
+ * supersection을 최대한 활용합니다.
+ * 
+ * kernel 실행 영역.
+ * md.pfn = 0
+ * md.virtual = 0x80000000
+ * md.length = 0x900000
+ * md.type = MT_MEMORY_RWX
+ */
 static void __init create_mapping(struct map_desc *md)
 {
 	unsigned long addr, length, end;
@@ -1068,6 +1144,12 @@ static void __init create_mapping(struct map_desc *md)
 			(long long)__pfn_to_phys((u64)md->pfn), md->virtual);
 	}
 
+	/* IAMROOT-12CD (2016-09-24):
+	 * --------------------------
+	 * md.type = MT_MEMORY_RWX
+	 * 여기까지 12CD 끝입니다.
+	 * AB팀으로 합칩니다.
+	 */
 	type = &mem_types[md->type];
 
 /* IAMROOT-12AB:
@@ -1078,12 +1160,24 @@ static void __init create_mapping(struct map_desc *md)
 	/*
 	 * Catch 36-bit addresses
 	 */
+	/* IAMROOT-12CD (2016-10-03):
+	 * --------------------------
+	 * 32비트 주소를 넘길때.
+	 */
 	if (md->pfn >= 0x100000) {
 		create_36bit_mapping(md, type);
 		return;
 	}
 #endif
 
+	/* IAMROOT-12CD (2016-09-24):
+	 * --------------------------
+	 * md->virtual = 0x80000000
+	 * md->length = 0x900000
+	 * addr = 0x80000000
+	 * phys = 0
+	 * length = 0x900000 + (0x80000000 & ~PAGE_MASK) = 0x900000
+	 */
 	addr = md->virtual & PAGE_MASK;
 	phys = __pfn_to_phys(md->pfn);
 	length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
@@ -1105,6 +1199,11 @@ static void __init create_mapping(struct map_desc *md)
  * pgd: pgd 엔트리 주소 
  *	rpi2: 0x8000_4000 ~ 0x8000_8000
  */
+	/* IAMROOT-12CD (2016-10-03):
+	 * --------------------------
+	 * pgd = 0x80006000
+	 * end = 0x80900000
+	 */
 	pgd = pgd_offset_k(addr);
 	end = addr + length;
 
@@ -1121,9 +1220,24 @@ static void __init create_mapping(struct map_desc *md)
  *		alloc_init_pud(0x8000_6008, 0x8020_0000, 0x8040_0000, 0x1010_0000, 
  *		alloc_init_pud(0x8000_6010, 0x8040_0000, 0x8050_0000, 0x1030_0000,
  */
+	/* IAMROOT-12CD (2016-10-03):
+	 * --------------------------
+	 * next		pgd		addr		phys
+	 * 0x80200000	0x80006000	0x80000000	0
+	 * 0x80400000	0x80006008	0x80200000	0x200000
+	 * 0x80600000	0x8000600c	0x80400000	0x400000
+	 * 0x80800000	0x80006010	0x80600000	0x600000
+	 * 0x80c00000	0x80006018	0x80800000	0x800000
+	 * 0x81000000	0x8000601c	0x80900000	0x1000000
+	 */
 	do {
 		unsigned long next = pgd_addr_end(addr, end);
 
+		/* IAMROOT-12CD (2016-10-03):
+		 * --------------------------
+		 * pgd 0x80006000, addr=0x80000000, next = 0x80200000, phys = 0
+		 * type = &mem_types[MT_MEMORY_RWX]
+		 */
 		alloc_init_pud(pgd, addr, next, phys, type);
 
 		phys += next - addr;
@@ -1133,6 +1247,14 @@ static void __init create_mapping(struct map_desc *md)
 
 /*
  * Create the architecture specific mappings
+ */
+/* IAMROOT-12D (2016-10-04):
+ * --------------------------
+ * io_desc[0].pfn = 0x3b800
+ * io_desc[0].virtual = 0xbb800000
+ * io_desc[0].length = 0x800000
+ * io_desc[0].type = MT_MEMORY_DMA_READY
+ * nr = 1
  */
 void __init iotable_init(struct map_desc *io_desc, int nr)
 {
@@ -1368,9 +1490,22 @@ void __init sanity_check_meminfo(void)
  *                          (-1을 해야 lowmem영역에서 변환함)
  *                vmalloc_limit = 물리주소에서의 lowmem/highmem의 경계
  */
+	/* IAMROOT-12CD (2016-07-23):
+	 * --------------------------
+	 * vmalloc_limit = 0x6F800000	3.835G
+	 */
 	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1;
 	struct memblock_region *reg;
 
+	/* IAMROOT-12CD (2016-07-23):
+	 * --------------------------
+	 * for (reg = memblock.memory.regions;
+	 *      reg < (memblock.memory.regions + memblock.memory.cnt);
+	 *      reg++)
+	 * reg.base: 0x0
+	 * reg.size: 0x3c000000 (960mb)
+	 * reg.flags: 0
+	 */
 	for_each_memblock(memory, reg) {
 		phys_addr_t block_start = reg->base;
 		phys_addr_t block_end = reg->base + reg->size;
@@ -1379,6 +1514,9 @@ void __init sanity_check_meminfo(void)
 		if (reg->base >= vmalloc_limit)
 			highmem = 1;
 		else
+			/* IAMROOT-12CD (2016-08-06):
+			 * size_limit = 0x6F800000(3.835G) - 0;
+			 */
 			size_limit = vmalloc_limit - reg->base;
 
 		if (!IS_ENABLED(CONFIG_HIGHMEM) || cache_is_vipt_aliasing()) {
@@ -1401,6 +1539,9 @@ void __init sanity_check_meminfo(void)
  * highmem을 모두 포함하는 경우(경계에 걸친 경우) highmem에 해당하는
  * 공간을 memblock에서 remove한다.
  */
+			/* IAMROOT-12CD (2016-08-06):
+			 * reg->size: 960mb, size_limit: 3.835G
+			 */
 			if (reg->size > size_limit) {
 				phys_addr_t overlap_size = reg->size - size_limit;
 
@@ -1419,11 +1560,18 @@ void __init sanity_check_meminfo(void)
  * 는 memblock의 끝이 대입되고 memblock이 lowmem과 highmem이 겹쳐있는 block을
  * 만나게되면 arm_lowmem_limit는 최대 lowmem.highmem 영역 경계 값이 된다. 
  */
+		/* IAMROOT-12CD (2016-08-06):
+		 * block_end: 960mb, arm_lowmem_limit: 0
+		 */
 		if (!highmem) {
 			if (block_end > arm_lowmem_limit) {
 				if (reg->size > size_limit)
 					arm_lowmem_limit = vmalloc_limit;
 				else
+					/* IAMROOT-12CD (2016-08-14):
+					 * --------------------------
+					 * arm_lowmem_limit: 0x3c000000(960mb)
+					 */
 					arm_lowmem_limit = block_end;
 			}
 
@@ -1456,12 +1604,19 @@ void __init sanity_check_meminfo(void)
  * arm_lowmem_limit:
  *	물리 주소에서의 lowmem/highmem 영역 경계
  */
+	/* IAMROOT-12CD (2016-08-06):
+	 * high_memory = (0x3c000000 - 1) + 0x80000000 + 1
+	 *             = 0xBC000000
+	 */
 	high_memory = __va(arm_lowmem_limit - 1) + 1;
 
 	/*
 	 * Round the memblock limit down to a pmd size.  This
 	 * helps to ensure that we will allocate memory from the
 	 * last full pmd, which should be mapped.
+	 */
+	/* IAMROOT-12CD (2016-08-06):
+	 * memblock_limit = 960mb
 	 */
 	if (memblock_limit)
 		memblock_limit = round_down(memblock_limit, PMD_SIZE);
@@ -1485,12 +1640,26 @@ static inline void prepare_page_table(void)
 	 * Clear out all the mappings below the kernel image.
 	 */
 
-/* IAMROOT-12AB:
- * -------------
- * rpi2: 0x0000_0000 ~ 0x7f00_0000 까지 2M 단위로
- *       pmd_clear(0x8000_4000),
- *       pmd_clear(0x8000_4008), ...
- */
+	/* IAMROOT-12AB:
+	 * -------------
+	 * rpi2: 0x0000_0000 ~ 0x7f00_0000 까지 2M 단위로
+	 *       pmd_clear(0x8000_4000),
+	 *       pmd_clear(0x8000_4008), ...
+	 */
+	/* IAMROOT-12CD (2016-09-10):
+	 * --------------------------
+	 * 커널이미지 아래 모든 매핑을 청소(data clean)합니다.
+	 * MODULES_VADDR = 2G-16M = 0x7f000000
+	 * PMD_SIZE = (1 << 21) = 2M
+	 *
+	 *	addr		pmd_off_k
+	 *	0		0x80004000
+	 *	0x200000	0x80004008
+	 *	0x400000	0x80004010
+	 *	0x600000	0x80004018
+	 *	...
+	 *	0x7ee00000	0x80005fb8
+	 */
 	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
 		pmd_clear(pmd_off_k(addr));
 
@@ -1505,19 +1674,39 @@ static inline void prepare_page_table(void)
 	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
 #endif
 
-/* IAMROOT-12AB:
- * -------------
- * 모듈영역(XIP 부분은 제외)을 pmd_clear 한다.
- */
+	/* IAMROOT-12AB:
+	 * -------------
+	 * 모듈영역(XIP 부분은 제외)을 pmd_clear 한다.
+	 *
+	 * IAMROOT-12CD (2016-09-24):
+	 * --------------------------
+	 *	addr		pmd_off_k
+	 *	0x7f000000	0x80005fc0
+	 *	0x7f200000	0x80005fc8
+	 *	0x7f400000	0x80005fd0
+	 *	...
+	 *	0x7fe00000	0x80005ff8
+	 */
 	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
 		pmd_clear(pmd_off_k(addr));
 
-/* IAMROOT-12AB:
- * -------------
- * 첫 번째 memory memblock의 끝까지(단 lowmem/highmem 경계를 넘지 않는)
- */
+	/* IAMROOT-12AB:
+	 * -------------
+	 * 첫 번째 memory memblock의 끝까지(단 lowmem/highmem 경계를 넘지 않는)
+	 */
 	/*
 	 * Find the end of the first block of lowmem.
+	 */
+	/* IAMROOT-12CD (2016-09-24):
+	 * --------------------------
+	 * .memory
+	 * {cnt = 0x1, max = 0x80, total_size = 0x3c000000, regions = {
+	 *   [0] = {base = 0x0, size = 0x3c000000, flags = 0x0}, 0 ~ 960M 영역.
+	 *   [1] = {base = 0x0, size = 0x0, flags = 0x0},
+	 *   ...
+	 * }}
+	 *
+	 * end = 960M
 	 */
 	end = memblock.memory.regions[0].base + memblock.memory.regions[0].size;
 	if (end >= arm_lowmem_limit)
@@ -1528,11 +1717,19 @@ static inline void prepare_page_table(void)
 	 * memory bank, up to the vmalloc region.
 	 */
 
-/* IAMROOT-12AB:
- * -------------
- * 첫 memory block의 끝 부터(lowmem/highmem 까지로 제한) ~ VMALLOC_START를 
- * pmd_clear 한다.
- */
+	/* IAMROOT-12AB:
+	 * -------------
+	 * 첫 memory block의 끝 부터(lowmem/highmem 까지로 제한) ~ VMALLOC_START를 
+	 * pmd_clear 한다.
+	 */
+	/* IAMROOT-12CD (2016-09-24):
+	 * --------------------------
+	 * end = 960M, addr = 0x80000000 + 960M = 2.96G
+	 * VMALLOC_START = 0xbc800000(968M의 가상주소) = 3.968G
+	 * PMD_SIZE = 2M
+	 *
+	 * 2.96G ~ 3.968G 커널 영역의 Cache clear
+	 */
 	for (addr = __phys_to_virt(end);
 	     addr < VMALLOC_START; addr += PMD_SIZE)
 		pmd_clear(pmd_off_k(addr));
@@ -1554,6 +1751,11 @@ void __init arm_mm_memblock_reserve(void)
 	/*
 	 * Reserve the page tables.  These are already in use,
 	 * and can only be in node 0.
+	 */
+	/* IAMROOT-12CD (2016-08-20):
+	 * --------------------------
+	 * swapper_pg_dir = 0x80004000 ,
+	 * memblock_reserve(0x4000, 0x4000);
 	 */
 	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_PG_DIR_SIZE);
 
@@ -1752,6 +1954,12 @@ static void __init kmap_init(void)
 			_PAGE_KERNEL_TABLE);
 }
 
+/* IAMROOT-12 fehead (2016-11-18):
+ * --------------------------
+ * 0M ~ 960M(lowmem) 메모리 영역을 page table에 맵핑한다.
+ * 여기서는 주로 커널 영역을 RWX 속성을 가지게 하며 나머지 영역은 RW영역을 가지
+ * 게 한다.
+ */
 static void __init map_lowmem(void)
 {
 	struct memblock_region *reg;
@@ -1760,11 +1968,25 @@ static void __init map_lowmem(void)
  * -------------
  * 커널 코드와 데이터는 섹션 매핑을 사용한다.
  */
+	/* IAMROOT-12CD (2016-09-24):
+	 * --------------------------
+	 * _stext = 0x80008240, kernel_x_start = 0x0
+	 * __init_end = 0x8080c000, kernel_x_end = 0x900000
+	 */
 	phys_addr_t kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
 	phys_addr_t kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
 
 	/* Map all the lowmem memory banks. */
 	for_each_memblock(memory, reg) {
+		/* IAMROOT-12CD (2016-08-20):
+		 * --------------------------
+		 * .memory
+		 * {cnt = 0x1, max = 0x80, total_size = 0x3c000000, regions = {
+		 *   [0] = {base = 0x0, size = 0x3c000000, flags = 0x0}, 0 ~ 960M 영역.
+		 *   [1] = {base = 0x0, size = 0x0, flags = 0x0},
+		 *   ...
+		 * } }
+		 */
 		phys_addr_t start = reg->base;
 		phys_addr_t end = start + reg->size;
 		struct map_desc map;
@@ -1986,6 +2208,10 @@ void __init paging_init(const struct machine_desc *mdesc)
  * mem_types[] 배열에 아키텍처가 추가로 설정한다.
  */
 	build_mem_type_table();
+	/* IAMROOT-12 fehead (2016-11-18):
+	 * --------------------------
+	 * page table(0x8000_4000 ~ 0x8000_8000 까지)를 초기화한다.
+	 */
 	prepare_page_table();
 	map_lowmem();
 	dma_contiguous_remap();

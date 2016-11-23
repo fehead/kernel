@@ -284,7 +284,17 @@ static struct resource mem_res[] = {
 };
 
 #define video_ram   mem_res[0]
+/* IAMROOT-12 fehead (2016-11-20):
+ * --------------------------
+ * {start = 0x8000, end = 0x79cacf, name = 0x8068d7dn, flags = 0x200,
+ *	parent = &ioport_resource sibling = kernel_data, child = 0x0}
+ */
 #define kernel_code mem_res[1]
+/* IAMROOT-12 fehead (2016-11-20):
+ * --------------------------
+ * {start = 0x80c000, end = 0x95179b, flags = 0x200,
+ * parent = &ioport_resource, sibling = 0x0, child = 0x0}
+ */
 #define kernel_data mem_res[2]
 
 static struct resource io_res[] = {
@@ -1247,6 +1257,10 @@ static int __init early_mem(char *p)
 }
 early_param("mem", early_mem);
 
+/* IAMROOT-12 fehead (2016-11-20):
+ * --------------------------
+ * iomem_resource에 메모리 "System RAM", kernel_code, kernel_data와 
+ */
 static void __init request_standard_resources(const struct machine_desc *mdesc)
 {
 	struct memblock_region *region;
@@ -1261,12 +1275,23 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
 	kernel_data.start   = virt_to_phys(_sdata);
 	kernel_data.end     = virt_to_phys(_end - 1);
 
+/* IAMROOT-12 fehead (2016-11-20):
+ * --------------------------
+ * memblock.memory.regions[0] = {base = 0x0, size = 0x3c000000, flags = 0x0}
+ */
 	for_each_memblock(memory, region) {
 
 /* IAMROOT-12AB:
  * -------------
  * System RAM을 iomem_resource에 등록
  */
+		/* IAMROOT-12 fehead (2016-11-20):
+		 * --------------------------
+		 * res->name = "System RAM"
+		 * res->start = 0
+		 * res->end = 0x3bffffff
+		 * res->flags = 0x80000200(IORESOURCE_MEM | IORESOURCE_BUSY)
+		 */
 		res = memblock_virt_alloc(sizeof(*res), 0);
 		res->name  = "System RAM";
 		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
@@ -1295,6 +1320,10 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
  * -------------
  * Video RAM 영역을 iomem_resource에 추가
  */
+/* IAMROOT-12 fehead (2016-11-20):
+ * --------------------------
+ * pi2 - video_start = 0x0, video_end = 0x0
+ */
 	if (mdesc->video_start) {
 		video_ram.start = mdesc->video_start;
 		video_ram.end   = mdesc->video_end;
@@ -1309,6 +1338,10 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
 /* IAMROOT-12AB:
  * -------------
  * 머신에 등록된 포트가 있는 경우 ioport_resource에 추가한다.
+ */
+/* IAMROOT-12 fehead (2016-11-20):
+ * --------------------------
+ * pi2 - reserve_lp0 = 0x0, reserve_lp1 = 0x0, reserve_lp2 = 0x0,
  */
 	if (mdesc->reserve_lp0)
 		request_resource(&ioport_resource, &lp0);

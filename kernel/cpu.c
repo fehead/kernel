@@ -739,6 +739,10 @@ static DECLARE_BITMAP(cpu_possible_bits, CONFIG_NR_CPUS) __read_mostly
 #else
 static DECLARE_BITMAP(cpu_possible_bits, CONFIG_NR_CPUS) __read_mostly;
 #endif
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * p/x *cpu_possible_mask = {bits = {0xf}}
+ */
 const struct cpumask *const cpu_possible_mask = to_cpumask(cpu_possible_bits);
 EXPORT_SYMBOL(cpu_possible_mask);
 

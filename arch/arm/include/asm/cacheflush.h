@@ -423,6 +423,11 @@ static inline void flush_cache_vunmap(unsigned long start, unsigned long end)
  * Ensure preceding writes to *p by this CPU are visible to
  * subsequent reads by other CPUs:
  */
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * p = {mask = 0x3, shift_aff = {0x0, 0x6, 0xe}, bits = 0x2}
+ * size = sizeof(*p)
+ */
 static inline void __sync_cache_range_w(volatile void *p, size_t size)
 {
 	char *_p = (char *)p;

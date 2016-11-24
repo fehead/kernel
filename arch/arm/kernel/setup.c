@@ -811,6 +811,10 @@ void notrace cpu_init(void)
  *
  * 따라서 __cpu_logical_map은 모두 invalid mpidr 값을 가지도록 초기화된다.
  */
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * rpi2: __cpu_logical_map[] = { 0xf00, 0xf01, 0xf02, 0xf03 }
+ */
 u32 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = MPIDR_INVALID };
 
 void __init smp_setup_processor_id(void)
@@ -969,6 +973,10 @@ static void __init smp_build_mpidr_hash(void)
 	if (mpidr_hash_size() > 4 * num_possible_cpus())
 		pr_warn("Large number of MPIDR hash buckets detected\n");
 
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * mpidr_hash  = {mask = 0x3, shift_aff = {0x0, 0x6, 0xe}, bits = 0x2}
+ */
 	sync_cache_w(&mpidr_hash);
 }
 #endif
@@ -1458,6 +1466,10 @@ static void __init reserve_crashkernel(void)
 	insert_resource(&iomem_resource, &crashk_res);
 }
 #else
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * 라즈베리파이2
+ */
 static inline void reserve_crashkernel(void) {}
 #endif /* CONFIG_KEXEC */
 
@@ -1482,6 +1494,7 @@ void __init hyp_mode_check(void)
 		pr_info("CPU: All CPU(s) started in SVC mode.\n");
 #endif
 }
+
 void __init setup_arch(char **cmdline_p)
 {
 	const struct machine_desc *mdesc;
@@ -1634,7 +1647,7 @@ void __init setup_arch(char **cmdline_p)
 
 /* IAMROOT-12AB:
  * -------------
- * 인터럽트 핸들러가 호출할 함수
+ * 인터럽트 핸들러가 호출할 함수 * pi2는 관계 없음.
  */
 	handle_arch_irq = mdesc->handle_irq;
 #endif

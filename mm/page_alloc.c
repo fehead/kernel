@@ -1962,6 +1962,10 @@ void split_page(struct page *page, unsigned int order)
 	VM_BUG_ON_PAGE(PageCompound(page), page);
 	VM_BUG_ON_PAGE(!page_count(page), page);
 
+/* IAMROOT-12:
+ * -------------
+ * order 페이지를 order 0 페이지로 모두 분리한다.
+ */
 #ifdef CONFIG_KMEMCHECK
 	/*
 	 * Split shadow pages too, because free(page[0]) would
@@ -1970,6 +1974,12 @@ void split_page(struct page *page, unsigned int order)
 	if (kmemcheck_page_is_tracked(page))
 		split_page(virt_to_page(page[0].shadow), order);
 #endif
+
+
+/* IAMROOT-12:
+ * -------------
+ * 페이지의 참조카운터를 1로 설정하여 사용중으로 설정한다.
+ */
 
 	set_page_owner(page, 0, 0);
 	for (i = 1; i < (1 << order); i++) {
@@ -1981,6 +1991,11 @@ EXPORT_SYMBOL_GPL(split_page);
 
 int __isolate_free_page(struct page *page, unsigned int order)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * 해당 페이지를 버디에서 분리하고 페이지 수를 반환한다.
+ */
 	unsigned long watermark;
 	struct zone *zone;
 	int mt;
@@ -1990,6 +2005,12 @@ int __isolate_free_page(struct page *page, unsigned int order)
 	zone = page_zone(page);
 	mt = get_pageblock_migratetype(page);
 
+/* IAMROOT-12:
+ * -------------
+ * 페이지 블럭이 isolate 타입이 아닌 경우 low 워터마크에 현재 페이지 수 만큼 
+ * 추가하여 워터마크 체크를 수행하여 여전히 메모리 부족인 경우 0으로 
+ * 함수를 빠져나간다.
+ */
 	if (!is_migrate_isolate(mt)) {
 		/* Obey watermarks as if the page was being allocated */
 		watermark = low_wmark_pages(zone) + (1 << order);
@@ -2000,11 +2021,22 @@ int __isolate_free_page(struct page *page, unsigned int order)
 	}
 
 	/* Remove page from free list */
+
+/* IAMROOT-12:
+ * -------------
+ * 관리하던 버디 리스트에서 제거한다.
+ */
 	list_del(&page->lru);
 	zone->free_area[order].nr_free--;
 	rmv_page_order(page);
 
 	/* Set the pageblock if the isolated page is at least a pageblock */
+
+/* IAMROOT-12:
+ * -------------
+ * 페이지블럭의 절반 이상의 order를 가진 페이지의 경우 속해있는 모든 페이지 
+ * 블럭의 migrate 타입을 모두 MIGRATE_MOVABLE로 변경한다.
+ */
 	if (order >= pageblock_order - 1) {
 		struct page *endpage = page + (1 << order) - 1;
 		for (; page < endpage; page += pageblock_nr_pages) {
@@ -2036,12 +2068,21 @@ int split_free_page(struct page *page)
 
 	order = page_order(page);
 
+/* IAMROOT-12:
+ * -------------
+ * 요청 페이지를 버디에서 분리하고 페이지 수를 알아온다.
+ */
 	nr_pages = __isolate_free_page(page, order);
 	if (!nr_pages)
 		return 0;
 
 	/* Split into individual pages */
 	set_page_refcounted(page);
+
+/* IAMROOT-12:
+ * -------------
+ * order 페이지를 order 0 페이지로 모두 분리한다.
+ */
 	split_page(page, order);
 	return nr_pages;
 }
@@ -2243,6 +2284,10 @@ late_initcall(fail_page_alloc_debugfs);
 
 #else /* CONFIG_FAIL_PAGE_ALLOC */
 
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * pi2
+ */
 static inline bool should_fail_alloc_page(gfp_t gfp_mask, unsigned int order)
 {
 	return false;
@@ -2652,16 +2697,16 @@ zonelist_scan:
  */
 			if (!zone_local(ac->preferred_zone, zone))
 				break;
-			/* IAMROOT-12 fehead (2016-10-29):
-			 * --------------------------
-			 * deplete : 비우다.
-			 */
 
 /* IAMROOT-12:
  * -------------
  * 해당 zone의 free 페이지가 없는 경우 공정하게 처리할 여력이 없으므로 
  * nr_fair_skipped 카운터를 증가시키고 다음 zone으로 skip
  */
+			/* IAMROOT-12 fehead (2016-10-29):
+			 * --------------------------
+			 * deplete : 비우다.
+			 */
 			if (test_bit(ZONE_FAIR_DEPLETED, &zone->flags)) {
 				nr_fair_skipped++;
 				continue;
@@ -2693,6 +2738,23 @@ zonelist_scan:
 		 * will require awareness of zones in the
 		 * dirty-throttling and the flusher threads.
 		 */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 쓰기를 위해 페이지 캐시 페이지를 할당 할 때, 우리는 더티 한도 내에서 존을 가
+ * 져오고 싶습니다. 따라서 하나의 존이 전역 적으로 허용 된 더티 페이지의 비례 지
+ * 분 이상을 보유하지는 않습니다. 더티 제한은 kswapd가 LRU 목록의 페이지를 작
+ * 성하지 않고도 균형을 유지할 수 있도록 영역의 저급 예약 및 높은 워터 마크를 고
+ * 려합니다.
+ *
+ * 이는 더 높은 영역이 가득 차기 전에 할당이 실패하여 더 낮은 영역에 대한 압박을
+ * 증가시킬 수있는 것처럼 보일 수 있습니다. 그러나이 똑같은 메커니즘으로 하위 구
+ * 역이 보호되므로 넘쳐나는 페이지는 제한적입니다. 실용적인 부담이되어서는 안됩니다.
+ *
+ * XXX : 현재로서는 재 할당을하기 전에 느린 경로 (ALLOC_WMARK_LOW 설정 해제)의
+ * 영역 별 더티 제한을 초과 할 수있는 할당을 허용합니다. 이는 NUMA 설정시 허용되
+ * 는 영역이 함께 전역 제한에 도달 할만큼 크지 않을 때 중요합니다. 이러한 상황을
+ * 적절하게 해결하려면 더러운 스로틀과 플러 셔 스레드에서 영역을 인식해야합니다.
+ */
 
 /* IAMROOT-12:
  * -------------
@@ -3586,6 +3648,13 @@ got_pg:
  *	- null인 경우 전체 노드를 대상으로 할당한다.
  *	- 노드 비트맵이 설정된 경우 해당 노드만을 대상으로 할당한다.
  */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 예) gfp_mask=0x201200, order=0, zonelist=0x80889800<contig_page_data+2176>
+ * nodemask=0x0
+ * zonelist = {zlcache_ptr = 0x0, _zonerefs = {{zone = 0x80888f80, zone_idx = 0x0},
+ *	{zone = 0x0, zone_idx = 0x0}, {zone = 0x0, zone_idx = 0x0}}}
+ */
 struct page *
 __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 			struct zonelist *zonelist, nodemask_t *nodemask)
@@ -3607,7 +3676,13 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
  * -------------
  * 할당 요청 사항을 ac에 저장한다
  *
- * .high_zoneidx: gfp_mask에서 지정된 zone
+ * .high_zoneidx: gfp_mask에서 지정된 zone(rpi2: 0(ZONE_NORMAL) ~ 1(ZONE_MOVABLE))
+ */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 예) ac = {zonelist = 0x0, nodemask = 0(ZONE_NORMAL), preferred_zone = 0x0,
+ *	classzone_idx = 0x0, migratetype = 0x0(MIGRATE_UNMOVABLE),
+ *	high_zoneidx = 0(ZONE_NORMAL)}
  */
 	struct alloc_context ac = {
 		.high_zoneidx = gfp_zone(gfp_mask),
@@ -3618,6 +3693,11 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 /* IAMROOT-12:
  * -------------
  * 부트업 타임에는 wait, fs, io가 동작하지 않도록 제한한다.
+ */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * gfp_allowed_mask = 0x1ffff2f
+ * gfp_mask = ftp_mask = 0x201200
  */
 	gfp_mask &= gfp_allowed_mask;
 
@@ -3682,6 +3762,13 @@ retry_cpuset:
  */
 	ac.zonelist = zonelist;
 	/* The preferred zone is used for statistics later */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 선호 zone은 나중에 통계로 사용된다.
+ * 예) ac = {zonelist=contig_page_data.zonelist, nodemask = 0(ZONE_NORMAL),
+ *	preferred_zone = 0x0, classzone_idx = 0x0, migratetype = 0x0(MIGRATE_UNMOVABLE),
+ *	high_zoneidx = 0(ZONE_NORMAL)}
+ */
 	preferred_zoneref = first_zones_zonelist(ac.zonelist, ac.high_zoneidx,
 				ac.nodemask ? : &cpuset_current_mems_allowed,
 				&ac.preferred_zone);

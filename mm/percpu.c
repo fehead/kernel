@@ -2263,6 +2263,11 @@ early_param("percpu_alloc", percpu_alloc_setup);
  * On success, pointer to the new allocation_info is returned.  On
  * failure, ERR_PTR value is returned.
  */
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * PERCPU_MODULE_RESERVE = 8 << 10, PERCPU_DYNAMIC_RESERVE = 20 << 10
+ * (PERCPU_MODULE_RESERVE, PERCPU_DYNAMIC_RESERVE, PAGE_SIZE, NULL)
+ */
 static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
 				size_t reserved_size, size_t dyn_size,
 				size_t atom_size,
@@ -2506,6 +2511,13 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
  *
  * RETURNS:
  * 0 on success, -errno on failure.
+ */
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * PERCPU_MODULE_RESERVE = 8 << 10, PERCPU_DYNAMIC_RESERVE = 20 << 10
+ * rc = pcpu_embed_first_chunk(PERCPU_MODULE_RESERVE,
+ *      	    PERCPU_DYNAMIC_RESERVE, PAGE_SIZE, NULL,
+ *      	    pcpu_dfl_fc_alloc, pcpu_dfl_fc_free);
  */
 int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 				  size_t atom_size,
@@ -2811,6 +2823,10 @@ static void __init pcpu_dfl_fc_free(void *ptr, size_t size)
 	memblock_free_early(__pa(ptr), size);
 }
 
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * pi2
+ */
 void __init setup_per_cpu_areas(void)
 {
 	unsigned long delta;
@@ -2830,6 +2846,10 @@ void __init setup_per_cpu_areas(void)
  *	- 모듈에서 사용하는 static per-cpu 공간이 8K 밖에 제공되지 않으므로 
  *	  모듈에서 사용량이 많은 경우 추가하여 사용해야 한다.
  * PERCPU_DYNAMIC_RESERVE(32bit=20K, 64bit=28K)
+ */
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * PERCPU_MODULE_RESERVE = 8 << 10, PERCPU_DYNAMIC_RESERVE = 20 << 10
  */
 	rc = pcpu_embed_first_chunk(PERCPU_MODULE_RESERVE,
 				    PERCPU_DYNAMIC_RESERVE, PAGE_SIZE, NULL,

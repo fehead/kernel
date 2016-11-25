@@ -168,6 +168,11 @@ struct vm_area_struct;
 #define __GFP_HIGHMEM	((__force gfp_t)___GFP_HIGHMEM)
 #define __GFP_DMA32	((__force gfp_t)___GFP_DMA32)
 #define __GFP_MOVABLE	((__force gfp_t)___GFP_MOVABLE)  /* Page is movable */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * ___GFP_DMA: 0x01u, ___GFP_HIGHMEM: 0x02u, ___GFP_DMA32: 0x04u, ___GFP_MOVABLE: 0x08u
+ * GFP_ZONEMASK = 0xf
+ */
 #define GFP_ZONEMASK	(__GFP_DMA|__GFP_HIGHMEM|__GFP_DMA32|__GFP_MOVABLE)
 /*
  * Action modifiers - doesn't change the zoning
@@ -196,6 +201,10 @@ struct vm_area_struct;
  *      비상용으로 reserve한 영역을 사용하지 못하게 요청한다.
  */
 
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * __GFP_WAIT	0x10u
+ */
 #define __GFP_WAIT	((__force gfp_t)___GFP_WAIT)	/* Can wait and reschedule? */
 #define __GFP_HIGH	((__force gfp_t)___GFP_HIGH)	/* Should access emergency pools? */
 #define __GFP_IO	((__force gfp_t)___GFP_IO)	/* Can start physical IO? */
@@ -435,6 +444,11 @@ static inline int gfpflags_to_migratetype(const gfp_t gfp_flags)
 static inline enum zone_type gfp_zone(gfp_t flags)
 {
 	enum zone_type z;
+	/* IAMROOT-12 fehead (2016-11-25):
+	 * --------------------------
+	 * GFP_ZONEMASK = 0xf, bit = flags & 0xf
+	 * flags = 0x201200, bit = 0
+	 */
 	int bit = (__force int) (flags & GFP_ZONEMASK);
 
 	z = (GFP_ZONE_TABLE >> (bit * ZONES_SHIFT)) &
@@ -487,6 +501,10 @@ struct page *
 __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 		       struct zonelist *zonelist, nodemask_t *nodemask);
 
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 예) gfp_mask=0x201200, order=0, zonelist=0x80889800<contig_page_data+2176>
+ */
 static inline struct page *
 __alloc_pages(gfp_t gfp_mask, unsigned int order,
 		struct zonelist *zonelist)

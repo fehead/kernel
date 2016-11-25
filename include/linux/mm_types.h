@@ -500,6 +500,10 @@ struct mm_struct {
 #endif
 };
 
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * mm_init_cpumask(&init_mm)
+ */
 static inline void mm_init_cpumask(struct mm_struct *mm)
 {
 

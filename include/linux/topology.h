@@ -122,6 +122,10 @@ static inline void set_cpu_numa_node(int cpu, int node)
 
 /* Returns the number of the current Node. */
 #ifndef numa_node_id
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * pi2
+ */
 static inline int numa_node_id(void)
 {
 	return cpu_to_node(raw_smp_processor_id());

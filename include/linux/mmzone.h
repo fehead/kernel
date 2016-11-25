@@ -827,6 +827,11 @@ struct zonelist_cache;
  * This struct contains information about a zone in a zonelist. It is stored
  * here to avoid dereferences into large structures and lookups of tables
  */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 이 구조체에는 zonelist의 영역(zone)에 대한 정보가 들어 있습니다. 큰 구조체의
+ * 역 참조와 테이블 조회를 피하기 위해 여기에 저장됩니다.
+ */
 struct zoneref {
 
 /* IAMROOT-12AB:
@@ -1232,6 +1237,11 @@ struct zoneref *next_zones_zonelist(struct zoneref *z,
  * used to iterate the zonelist with next_zones_zonelist by advancing it by
  * one before calling.
  */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 예) zonelist=contig_page_data.zonelist, nodemask = 0(ZONE_NORMAL),
+ *	high_zoneidx = 0(ZONE_NORMAL), zone=&ac.preferred_zone(0x0)
+ */
 static inline struct zoneref *first_zones_zonelist(struct zonelist *zonelist,
 					enum zone_type highest_zoneidx,
 					nodemask_t *nodes,
@@ -1264,6 +1274,18 @@ static inline struct zoneref *first_zones_zonelist(struct zonelist *zonelist,
  * zlist(zonelist)에서 highidx 초과한 zone을 filter 하고, nodemask에 표현되지 않은
  * 노드를 filter(nodemask=null인 경우는 모든 노드를 필터없이 사용)하여 iterator를 
  * 제공한다. 각 interation마다 출력되는 항목은 zone 포인터, z(zoneref 포인터)
+ */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * for_each_zone_zonelist_nodemask - 주어진 존 인덱스 또는 그 이하의 존리스트
+ *	내의 유효한 존을 반복하고 노드 마스크 내에서 반복하는 헬퍼 매크로
+ * @zone - 현재 zone iterator
+ * @z - zonelist-> zones 내의 현재 포인터 iterator
+ * @zlist - iterator 대상 zonelist
+ * @highidx - 반환 할 가장 높은 영역의 zone index
+ * @nodemask - 할당 자에 의해 허용 된 Nodemask
+ *
+ *이 반복자는 주어진 존 인덱스 또는 주어진 노드 마스크 이하의 모든 존을 반복합니다.
  */
 #define for_each_zone_zonelist_nodemask(zone, z, zlist, highidx, nodemask) \
 	for (z = first_zones_zonelist(zlist, highidx, nodemask, &zone);	\

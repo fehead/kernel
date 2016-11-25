@@ -2284,6 +2284,10 @@ late_initcall(fail_page_alloc_debugfs);
 
 #else /* CONFIG_FAIL_PAGE_ALLOC */
 
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * pi2
+ */
 static inline bool should_fail_alloc_page(gfp_t gfp_mask, unsigned int order)
 {
 	return false;
@@ -2693,16 +2697,16 @@ zonelist_scan:
  */
 			if (!zone_local(ac->preferred_zone, zone))
 				break;
-			/* IAMROOT-12 fehead (2016-10-29):
-			 * --------------------------
-			 * deplete : 비우다.
-			 */
 
 /* IAMROOT-12:
  * -------------
  * 해당 zone의 free 페이지가 없는 경우 공정하게 처리할 여력이 없으므로 
  * nr_fair_skipped 카운터를 증가시키고 다음 zone으로 skip
  */
+			/* IAMROOT-12 fehead (2016-10-29):
+			 * --------------------------
+			 * deplete : 비우다.
+			 */
 			if (test_bit(ZONE_FAIR_DEPLETED, &zone->flags)) {
 				nr_fair_skipped++;
 				continue;
@@ -2734,6 +2738,23 @@ zonelist_scan:
 		 * will require awareness of zones in the
 		 * dirty-throttling and the flusher threads.
 		 */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 쓰기를 위해 페이지 캐시 페이지를 할당 할 때, 우리는 더티 한도 내에서 존을 가
+ * 져오고 싶습니다. 따라서 하나의 존이 전역 적으로 허용 된 더티 페이지의 비례 지
+ * 분 이상을 보유하지는 않습니다. 더티 제한은 kswapd가 LRU 목록의 페이지를 작
+ * 성하지 않고도 균형을 유지할 수 있도록 영역의 저급 예약 및 높은 워터 마크를 고
+ * 려합니다.
+ *
+ * 이는 더 높은 영역이 가득 차기 전에 할당이 실패하여 더 낮은 영역에 대한 압박을
+ * 증가시킬 수있는 것처럼 보일 수 있습니다. 그러나이 똑같은 메커니즘으로 하위 구
+ * 역이 보호되므로 넘쳐나는 페이지는 제한적입니다. 실용적인 부담이되어서는 안됩니다.
+ *
+ * XXX : 현재로서는 재 할당을하기 전에 느린 경로 (ALLOC_WMARK_LOW 설정 해제)의
+ * 영역 별 더티 제한을 초과 할 수있는 할당을 허용합니다. 이는 NUMA 설정시 허용되
+ * 는 영역이 함께 전역 제한에 도달 할만큼 크지 않을 때 중요합니다. 이러한 상황을
+ * 적절하게 해결하려면 더러운 스로틀과 플러 셔 스레드에서 영역을 인식해야합니다.
+ */
 
 /* IAMROOT-12:
  * -------------
@@ -3627,6 +3648,13 @@ got_pg:
  *	- null인 경우 전체 노드를 대상으로 할당한다.
  *	- 노드 비트맵이 설정된 경우 해당 노드만을 대상으로 할당한다.
  */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 예) gfp_mask=0x201200, order=0, zonelist=0x80889800<contig_page_data+2176>
+ * nodemask=0x0
+ * zonelist = {zlcache_ptr = 0x0, _zonerefs = {{zone = 0x80888f80, zone_idx = 0x0},
+ *	{zone = 0x0, zone_idx = 0x0}, {zone = 0x0, zone_idx = 0x0}}}
+ */
 struct page *
 __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 			struct zonelist *zonelist, nodemask_t *nodemask)
@@ -3648,7 +3676,13 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
  * -------------
  * 할당 요청 사항을 ac에 저장한다
  *
- * .high_zoneidx: gfp_mask에서 지정된 zone
+ * .high_zoneidx: gfp_mask에서 지정된 zone(rpi2: 0(ZONE_NORMAL) ~ 1(ZONE_MOVABLE))
+ */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 예) ac = {zonelist = 0x0, nodemask = 0(ZONE_NORMAL), preferred_zone = 0x0,
+ *	classzone_idx = 0x0, migratetype = 0x0(MIGRATE_UNMOVABLE),
+ *	high_zoneidx = 0(ZONE_NORMAL)}
  */
 	struct alloc_context ac = {
 		.high_zoneidx = gfp_zone(gfp_mask),
@@ -3659,6 +3693,11 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 /* IAMROOT-12:
  * -------------
  * 부트업 타임에는 wait, fs, io가 동작하지 않도록 제한한다.
+ */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * gfp_allowed_mask = 0x1ffff2f
+ * gfp_mask = ftp_mask = 0x201200
  */
 	gfp_mask &= gfp_allowed_mask;
 
@@ -3723,6 +3762,13 @@ retry_cpuset:
  */
 	ac.zonelist = zonelist;
 	/* The preferred zone is used for statistics later */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 선호 zone은 나중에 통계로 사용된다.
+ * 예) ac = {zonelist=contig_page_data.zonelist, nodemask = 0(ZONE_NORMAL),
+ *	preferred_zone = 0x0, classzone_idx = 0x0, migratetype = 0x0(MIGRATE_UNMOVABLE),
+ *	high_zoneidx = 0(ZONE_NORMAL)}
+ */
 	preferred_zoneref = first_zones_zonelist(ac.zonelist, ac.high_zoneidx,
 				ac.nodemask ? : &cpuset_current_mems_allowed,
 				&ac.preferred_zone);

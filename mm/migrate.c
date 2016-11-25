@@ -64,6 +64,9 @@ int migrate_prep(void)
 }
 
 /* Do the necessary work of migrate_prep but not if it involves other CPUs */
+/* IAMROOT-12 fehead (2016-11-19):
+ * migrate_prep에 필요한 작업을 수행하고 다른 CPU와 관련된 작업은 수행하지 않습니다.
+ */
 int migrate_prep_local(void)
 {
 	lru_add_drain();

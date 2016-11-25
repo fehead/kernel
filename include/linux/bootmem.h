@@ -163,6 +163,11 @@ void *memblock_virt_alloc_try_nid(phys_addr_t size, phys_addr_t align,
 void __memblock_free_early(phys_addr_t base, phys_addr_t size);
 void __memblock_free_late(phys_addr_t base, phys_addr_t size);
 
+/* IAMROOT-12 fehead (2016-11-19):
+ * --------------------------
+ * free 영역을 구한다음 memblock.reserved 영역에 할당한 메모리 정보를 넣고 물리
+ * 주소를 가상주소로 바꾼후 반환한다.
+ */
 static inline void * __init memblock_virt_alloc(
 					phys_addr_t size,  phys_addr_t align)
 {

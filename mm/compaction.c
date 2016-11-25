@@ -99,6 +99,23 @@ static inline bool migrate_async_suitable(int migratetype)
  * the first and last page of a pageblock and avoid checking each individual
  * page in a pageblock.
  */
+/* IAMROOT-12 fehead (2016-11-19):
+ * --------------------------
+ * free 압축 스캐너의 마이그레이션으로 스캔하기 전에 [start_pfn, end_pfn) 간격으
+ * 로 주어진 페이지 블록의 전체 (또는 하위 세트)가 유효하고 동일한 영역 내에서
+ * 유효한지 확인하십시오. 그런 다음 스캐너는 pfn_valid_within()만 사용하여 페이
+ * 지 블록 내에서 구멍을 허용하는 아치를 확인해야합니다.
+ *
+ * start_pfn의 구조체 페이지 포인터를 반환하거나 검사가 통과되지 않으면 NULL을
+ * 반환합니다.
+ *
+ * 일부 구성에서는 node0 node1 node0과 같은 설정을 가질 수 있습니다. 즉, 영역의
+ * 페이지 범위 내의 모든 페이지가 단일 영역에 속하지 않을 수도 있습니다. 노드 0
+ * 과 노드 1 사이의 경계는 단일 페이지 블록 내에서 발생할 수 있지만 단일 페이지
+ * 블록 내에서 노드 0 노드 1 노드 0이 인터리빙되지는 않는다고 가정합니다. 따라서
+ * 페이지 블록의 첫 페이지와 마지막 페이지를 확인하고 페이지 블록의 각 개별 페이
+ * 지를 검사하지 않아도됩니다.
+ */
 static struct page *pageblock_pfn_to_page(unsigned long start_pfn,
 				unsigned long end_pfn, struct zone *zone)
 {
@@ -421,6 +438,16 @@ static bool compact_unlock_should_abort(spinlock_t *lock,
  *
  * Returns false when no scheduling was needed, or sync compaction scheduled.
  * Returns true when async compaction should abort.
+ */
+/* IAMROOT-12 fehead (2016-11-19):
+ * --------------------------
+ * 잠금 경합을 피하는 것 외에도, 압축은 need_resched()를 정기적으로 점검하고
+ * 동기화 압축에서 스케줄을 지정하거나 비동기 압축을 중단합니다.
+ * 이것은 compact_unlock_should_abort()가하는 것과 비슷하지만 잠금이 관련되지
+ * 않은 곳에서 사용됩니다.
+ *
+ * 스케줄링이 필요하지 않은 경우 false를 반환하거나 스케줄 된 동기화 압축을 반환합니다.
+ * 비동기 컴팩 션이 중단 될 때 true를 리턴합니다. 
  */
 static inline bool compact_should_abort(struct compact_control *cc)
 {
@@ -1097,6 +1124,11 @@ typedef enum {
  * starting at the block pointed to by the migrate scanner pfn within
  * compact_control.
  */
+/* IAMROOT-12 fehead (2016-11-19):
+ * --------------------------
+ * compact_control 내의 마이그레이션 스캐너 pfn이 가리키는 블록에서 시작하여 첫
+ * 번째 적합한 블록에서 마이그레이션 할 수있는 모든 페이지를 격리합니다.
+ */
 static isolate_migrate_t isolate_migratepages(struct zone *zone,
 					struct compact_control *cc)
 {
@@ -1125,6 +1157,12 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
 		 * This can potentially iterate a massively long zone with
 		 * many pageblocks unsuitable, so periodically check if we
 		 * need to schedule, or even abort async compaction.
+		 */
+		/* IAMROOT-12 fehead (2016-11-19):
+		 * --------------------------
+		 * 이것은 잠재적으로 많은 페이지 블록이 부적합한 대규모의 영역을
+		 * 반복 할 수 있으므로 주기적으로 확인하거나 비동기 압축을 중단
+		 * 해야하는지 정기적으로 확인하십시오.
 		 */
 		if (!(low_pfn % (SWAP_CLUSTER_MAX * pageblock_nr_pages))
 						&& compact_should_abort(cc))
@@ -1175,6 +1213,11 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
 	return cc->nr_migratepages ? ISOLATE_SUCCESS : ISOLATE_NONE;
 }
 
+/* IAMROOT-12 fehead (2016-11-19):
+ * --------------------------
+ * @return COMPACT_PARTIAL, COMPACT_COMPLETE, COMPACT_NO_SUITABLE_PAGE,
+ * COMPACT_CONTINUE;
+ */
 static int __compact_finished(struct zone *zone, struct compact_control *cc,
 			    const int migratetype)
 {
@@ -1185,6 +1228,10 @@ static int __compact_finished(struct zone *zone, struct compact_control *cc,
 		return COMPACT_PARTIAL;
 
 	/* Compaction run completes if the migrate and free scanner meet */
+	/* IAMROOT-12 fehead (2016-11-19):
+	 * --------------------------
+	 * 마이그레이션 및 프리 스캐너가 만나는 경우 압축 실행이 완료됩니다.
+	 */
 	if (cc->free_pfn <= cc->migrate_pfn) {
 		/* Let the next compaction start anew. */
 		zone->compact_cached_migrate_pfn[0] = zone->zone_start_pfn;
@@ -1196,6 +1243,12 @@ static int __compact_finished(struct zone *zone, struct compact_control *cc,
 		 * by kswapd when it goes to sleep. kswapd does not set the
 		 * flag itself as the decision to be clear should be directly
 		 * based on an allocation request.
+		 */
+		/* IAMROOT-12 fehead (2016-11-19):
+		 * --------------------------
+		 * sleep 상태가되면 kswapd가 PG_migrate_skip 정보를 지워야 함을
+		 * 표시하십시오. kswapd는 지우기 요청이 할당 요청에 직접 기반해
+		 * 야하므로 플래그 자체를 설정하지 않습니다.
 		 */
 		if (!current_is_kswapd())
 			zone->compact_blockskip_flush = true;
@@ -1230,6 +1283,10 @@ static int __compact_finished(struct zone *zone, struct compact_control *cc,
 			return COMPACT_PARTIAL;
 	}
 
+	/* IAMROOT-12 fehead (2016-11-19):
+	 * --------------------------
+	 * 적합한 페이지가 없다.
+	 */
 	return COMPACT_NO_SUITABLE_PAGE;
 }
 
@@ -1408,6 +1465,12 @@ static int compact_zone(struct zone *zone, struct compact_control *cc)
 	 * Setup to move all movable pages to the end of the zone. Used cached
 	 * information on where the scanners should start but check that it
 	 * is initialised by ensuring the values are within zone boundaries.
+	 */
+	/* IAMROOT-12 fehead (2016-11-19):
+	 * --------------------------
+	 * 모든 이동 가능한 페이지를 영역의 끝으로 이동하려면 설치하십시오. 스캐
+	 * 너가 시작해야하는 위치에 캐싱 된 정보가 있지만 값이 영역 경계 내에 있
+	 * 는지 확인하여 초기화되었는지 확인하십시오.
 	 */
 	cc->migrate_pfn = zone->compact_cached_migrate_pfn[sync];
 	cc->free_pfn = zone->compact_cached_free_pfn;

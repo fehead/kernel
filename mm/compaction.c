@@ -1818,6 +1818,13 @@ check_drain:
 		 * compact_finished() can detect immediately if allocation
 		 * would succeed.
 		 */
+		/* IAMROOT-12 fehead (2016-11-26):
+		 * --------------------------
+		 * 마이그레이션 스캐너가 마이그레이션 한 이전의 cc->order 정렬
+		 * 블록에서 멀리 이동 했습니까? 그렇다면 해제 된 페이지를 제거하
+		 * 여 병합하고 compact_finished()가 할당이 성공하면 즉시 감지 할
+		 * 수 있도록합니다.
+		 */
 		if (cc->order > 0 && last_migrated_pfn) {
 			int cpu;
 			unsigned long current_block_start =

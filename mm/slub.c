@@ -3750,6 +3750,11 @@ __kmem_cache_alias(const char *name, size_t size, size_t align,
 	return s;
 }
 
+/* IAMROOT-12 fehead (2016-12-03):
+ * --------------------------
+ * *s = { size = 0x20, object_size = 0x20, align = 0x40, name = "kmem_cache_node"
+ * flags = 0x2000
+ */
 int __kmem_cache_create(struct kmem_cache *s, unsigned long flags)
 {
 	int err;

@@ -253,6 +253,10 @@ extern void slab_init_memcg_params(struct kmem_cache *);
 
 #else /* !CONFIG_MEMCG_KMEM */
 
+/* IAMROOT-12 fehead (2016-12-03):
+ * --------------------------
+ * pi2
+ */
 #define for_each_memcg_cache(iter, root) \
 	for ((void)(iter), (void)(root); 0; )
 #define for_each_memcg_cache_safe(iter, tmp, root) \
@@ -294,6 +298,10 @@ static inline void memcg_uncharge_slab(struct kmem_cache *s, int order)
 {
 }
 
+/* IAMROOT-12 fehead (2016-12-03):
+ * --------------------------
+ * pi2
+ */
 static inline void slab_init_memcg_params(struct kmem_cache *s)
 {
 }

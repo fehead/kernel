@@ -232,6 +232,11 @@ bool compaction_deferred(struct zone *zone, int order)
  * which means an allocation either succeeded (alloc_success == true) or is
  * expected to succeed.
  */
+/* IAMROOT-12 fehead (2016-12-03):
+ * --------------------------
+ * 지정된 순서의 압축이 성공한 후 지연 추적 카운터를 업데이트합니다. 즉, 할당이
+ * 성공했거나 성공할 것으로 예상됩니다 (alloc_success == true).
+ */
 void compaction_defer_reset(struct zone *zone, int order,
 		bool alloc_success)
 {
@@ -1898,6 +1903,12 @@ out:
 	 * Release free pages and update where the free scanner should restart,
 	 * so we don't leave any returned pages behind in the next attempt.
 	 */
+	/* IAMROOT-12 fehead (2016-12-03):
+	 * --------------------------
+	 * 사용 가능한 페이지를 해제하고 free 스캐너를 다시 시작해야하는 위치를
+	 * 업데이트하십시오. 따라서 다음 시도에서 반환 된 페이지를 남겨 두지 않
+	 * 습니다.
+	 */
 	if (cc->nr_freepages > 0) {
 		unsigned long free_pfn = release_freepages(&cc->freepages);
 
@@ -2019,6 +2030,12 @@ unsigned long try_to_compact_pages(gfp_t gfp_mask, unsigned int order,
 			 * but it is not certain, hence the false. The caller
 			 * will repeat this with true if allocation indeed
 			 * succeeds in this zone.
+			 */
+			/* IAMROOT-12 fehead (2016-12-03):
+			 * --------------------------
+			 * 우리는 할당이이 영역에서 성공할 것이라고 생각하지만
+			 * 확실하지 않습니다. 따라서 거짓입니다.
+			 * 호출자는 실제로이 영역에서 할당이 성공하면 true로 반복합니다.
 			 */
 			compaction_defer_reset(zone, order, false);
 			/*

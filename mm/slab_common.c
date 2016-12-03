@@ -271,6 +271,10 @@ struct kmem_cache *find_mergeable(size_t size, size_t align,
  * Figure out what the alignment of the objects will be given a set of
  * flags, a user specified alignment and the size of the objects.
  */
+/* IAMROOT-12 fehead (2016-12-03):
+ * --------------------------
+ * flags=SLAB_HWCACHE_ALIGN(8192), ARCH_KMALLOC_MINALIGN=64, size=32
+ */
 unsigned long calculate_alignment(unsigned long flags,
 		unsigned long align, unsigned long size)
 {
@@ -282,6 +286,10 @@ unsigned long calculate_alignment(unsigned long flags,
 	 * alignment though. If that is greater then use it.
 	 */
 	if (flags & SLAB_HWCACHE_ALIGN) {
+		/* IAMROOT-12 fehead (2016-12-03):
+		 * --------------------------
+		 * pi2: size=32, ralign = 64, align = 64
+		 */
 		unsigned long ralign = cache_line_size();
 		while (size <= ralign / 2)
 			ralign /= 2;
@@ -674,6 +682,11 @@ int slab_is_available(void)
 
 #ifndef CONFIG_SLOB
 /* Create a cache during boot when no slab services are available yet */
+/* IAMROOT-12 fehead (2016-12-03):
+ * --------------------------
+ * s = &boot_kmem_cache_node, name = "kmem_cache_node",
+	size = sizeof(struct kmem_cache_node) = 32, flags = SLAB_HWCACHE_ALIGN
+ */
 void __init create_boot_cache(struct kmem_cache *s, const char *name, size_t size,
 		unsigned long flags)
 {
@@ -681,8 +694,17 @@ void __init create_boot_cache(struct kmem_cache *s, const char *name, size_t siz
 
 	s->name = name;
 	s->size = s->object_size = size;
+	/* IAMROOT-12 fehead (2016-12-03):
+	 * --------------------------
+	 * flags=SLAB_HWCACHE_ALIGN(8192), ARCH_KMALLOC_MINALIGN=64, size=32
+	 * s->align = 64
+	 */
 	s->align = calculate_alignment(flags, ARCH_KMALLOC_MINALIGN, size);
 
+	/* IAMROOT-12 fehead (2016-12-03):
+	 * --------------------------
+	 * pi2는 아무것도 하지않음.
+	 */
 	slab_init_memcg_params(s);
 
 	err = __kmem_cache_create(s, flags);

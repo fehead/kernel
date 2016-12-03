@@ -664,6 +664,7 @@ static void __lru_cache_add(struct page *page)
 /* IAMROOT-12:
  * -------------
  * 요청 페이지를 lruvec을 잘 찾아 추가한다.
+ * 참조 카운트가 1 증가 된다.
  */
 	page_cache_get(page);
 

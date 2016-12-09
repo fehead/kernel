@@ -285,6 +285,19 @@ unsigned long calculate_alignment(unsigned long flags,
 	 * The hardware cache alignment cannot override the specified
 	 * alignment though. If that is greater then use it.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * 요청한 align과 계산된 ralign 값 중 큰 수로 align 한다.
+ *	(계산된 ralign: size보다 같거나 큰 2의 차수 값)
+ *
+ * 예1)	align=32, size=28, 캐시라인=128
+ *      align=32
+ * 예2) align=64, size=28, 캐시라인=128 
+ *      align=64
+ * rpi2) align=64, size=16, 캐시라인=64 
+ *       align=64
+ */
 	if (flags & SLAB_HWCACHE_ALIGN) {
 		/* IAMROOT-12 fehead (2016-12-03):
 		 * --------------------------
@@ -295,6 +308,11 @@ unsigned long calculate_alignment(unsigned long flags,
 			ralign /= 2;
 		align = max(align, ralign);
 	}
+
+/* IAMROOT-12:
+ * -------------
+ * 요청 align이 ARCH_SLAB_MINALIGN(rpi2:8)보다 작은 경우 8로 설정
+ */
 
 	if (align < ARCH_SLAB_MINALIGN)
 		align = ARCH_SLAB_MINALIGN;
@@ -694,11 +712,17 @@ void __init create_boot_cache(struct kmem_cache *s, const char *name, size_t siz
 
 	s->name = name;
 	s->size = s->object_size = size;
+
 	/* IAMROOT-12 fehead (2016-12-03):
 	 * --------------------------
 	 * flags=SLAB_HWCACHE_ALIGN(8192), ARCH_KMALLOC_MINALIGN=64, size=32
 	 * s->align = 64
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * object 정렬 단위를 산출한다.
+ */
 	s->align = calculate_alignment(flags, ARCH_KMALLOC_MINALIGN, size);
 
 	/* IAMROOT-12 fehead (2016-12-03):

@@ -148,6 +148,10 @@ extern void *__alloc_bootmem_low_node(pg_data_t *pgdat,
 	__alloc_bootmem_low_node(pgdat, x, PAGE_SIZE, 0)
 
 
+/* IAMROOT-12 fehead (2016-11-28):
+ * --------------------------
+ * pi2
+ */
 #if defined(CONFIG_HAVE_MEMBLOCK) && defined(CONFIG_NO_BOOTMEM)
 
 /* FIXME: use MEMBLOCK_ALLOC_* variants here */
@@ -215,6 +219,10 @@ static inline void * __init memblock_virt_alloc_low_nopanic(
 						   NUMA_NO_NODE);
 }
 
+/* IAMROOT-12 fehead (2016-11-28):
+ * --------------------------
+ * pi2
+ */
 static inline void * __init memblock_virt_alloc_from_nopanic(
 		phys_addr_t size, phys_addr_t align, phys_addr_t min_addr)
 {

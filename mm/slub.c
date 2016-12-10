@@ -114,6 +114,69 @@
  * 			options set. This moves	slab handling out of
  * 			the fast path and disables lockless freelists.
  */
+/* IAMROOT-12 fehead (2016-12-10):
+ * --------------------------
+ * 잠금 명령 :
+ *    1. slab_mutex (글로벌 뮤텍스)
+ *    2. node-> list_lock
+ *    3. slab_lock (page) (몇몇 아치에서만 그리고 디버깅을 위해서)
+ *
+ *    slab_mutex
+ *
+ *    slab_mutex의 역할은 모든 슬랩 목록을 보호하고 주요 메타 데이터 변경 사항을
+ *	슬랩 캐시 구조와 동기화하는 것입니다.
+ *
+ *    slab_lock은 디버깅 및 cmpxchg_double을 수행 할 수없는 아치에서만 사용됩니다.
+ *	페이지 구조체의 두 번째 더블 단어 만 보호합니다. 의미
+ * A. page-> freelist -> 페이지에있는 오브젝트 목록 비우기
+ * B. 페이지 -> 카운터 -> 개체 카운터
+ * C. 페이지 -> 냉동 -> 냉동 상태
+ *
+ *    슬래브가 고정 된 경우 목록 관리가 면제됩니다. 어떤 목록에도 없습니다. 슬랩
+ *    을 동결시킨 프로세서는 페이지에서 목록 작업을 수행 할 수있는 프로세서입니
+ *    다. 다른 프로세서는 객체를 프리리스트에 넣을 수 있지만 슬래브를 동결시킨
+ *    프로세서는 페이지의 프리리스트에서 객체를 검색 할 수있는 유일한 객체입니다.
+ *
+ *    list_lock은 각 노드의 부분 및 전체 목록과 부분 슬랩 카운터를 보호합니다.
+ *    이 경우, 새로운 슬랩은 목록에 추가되거나 제거되지 않으며 부분 슬랩의 수가
+ *    수정되지 않습니다. (슬랩의 총 개수는 목록 잠금을 사용하지 않고 수정할 수있
+ *    는 원자 값입니다.)
+ *
+ *    list_lock은 중앙 집중식 잠금이므로 가능한 한 많이 사용하지 않습니다. SLUB
+ *    이 부분 슬랩을 처리 할 필요가없는 한, 중앙 집중식 잠금없이 작업을 계속할
+ *    수 있습니다. F.e. 슬래브를 채우는 일련의 긴 오브젝트를 할당 할 때 목록 잠
+ *    금이 필요하지 않습니다.
+ *    슬래브 할당자가 irq 컨텍스트에서 안전하게 사용할 수 있도록 할당 및 할당
+ *    해제 중에 인터럽트가 비활성화됩니다. 또한 커널 선점으로 인해 per_cpu 슬랩
+ *    을 처리하는 동안 프로세서가 변경되지 않도록 인터럽트가 비활성화됩니다.
+ *
+ *  SLUB은 각 프로세서에 하나의 슬랩을 할당합니다.
+ *  할당은 cpu 슬랩이라고하는 이러한 슬랩에서만 발생합니다.
+ *
+ *  자유 요소가있는 슬라브는 부분 목록에 보관되며 일반 작업 중에는 전체 슬랩에
+ *  대한 목록이 사용되지 않습니다. 전체 슬래브의 객체가 해제 된 경우 슬래브가 부
+ *  분 목록에 다시 표시됩니다. 그렇지 않으면 우리는 모든 객체를 스캔 할 수 없기
+ *  때문에 우리는 디버깅을 위해 풀 슬랩을 추적합니다.
+ *
+ *  슬랩은 비게 될 때 해방됩니다. 분해 및 설정이 최소화되므로 빠른 해제 및 할당
+ *  을 위해 CPU 캐시 당 페이지 할당자가 필요합니다.
+ *
+ *  LRU 관리에 사용되는 페이지 플래그의 오버로드.
+ *
+ *  PageActive 슬래브가 고정되어 목록 처리에서 제외됩니다.
+ *  즉, 슬랩은 특정 프로세서에 대한 할당을 만족시키는 것과 같은 용도로 사용됩니
+ *  다. 고정 된 상태에서 개체가 슬래브에서 해제 될 수 있지만 slab_free는 일반적
+ *  인 목록 작업을 건너 뜁니다. 슬래브가 더 이상 필요하지 않은 경우 슬래브를 슬
+ *  래브 목록에 통합하는 것은 슬래브를 잡고있는 프로세서에 달려 있습니다.
+ *
+ *  이 플래그를 사용하면 할당에 사용되는 슬래브를 표시 할 수 있습니다. 그런 슬랩
+ *  은 cpu 슬랩이됩니다. cpu 슬랩에는 슬래브 잠금 장치가 필요한 일반 프리리스트
+ *  외에 자유 오브젝트에 대한 잠금없는 액세스를 허용하는 추가 프리리스트가있을
+ *  수 있습니다.
+ *
+ *  PageError Slab은 디버그 옵션 설정 때문에 특별한 처리가 필요합니다. 이렇게하
+ *  면 슬래브 처리가 빠른 경로에서 벗어나 잠금이없는 프리리스트가 비활성화됩니다.
+ */
 
 static inline int kmem_cache_debug(struct kmem_cache *s)
 {
@@ -151,12 +214,22 @@ static inline bool kmem_cache_has_cpu_partial(struct kmem_cache *s)
  * Mininum number of partial slabs. These will be left on the partial
  * lists even if they are empty. kmem_cache_shrink may reclaim them.
  */
+/* IAMROOT-12 fehead (2016-12-10):
+ * --------------------------
+ * partial slabs의 최소 개수. 비어있는 경우에도 partial 목록에 남습니다.
+ * kmem_cache shrink가 그들을 되 찾을 수 있습니다.
+ */
 #define MIN_PARTIAL 5
 
 /*
  * Maximum number of desirable partial slabs.
  * The existence of more partial slabs makes kmem_cache_shrink
  * sort the partial list by the number of objects in use.
+ */
+/* IAMROOT-12 fehead (2016-12-10):
+ * --------------------------
+ * 원하는 partial slabs의 최대 수입니다. 더 많은 partial slabs가 존재하면
+ * kmem_cache_shrink는 partial 목록을 사용중인 객체의 수만큼 정렬합니다.
  */
 #define MAX_PARTIAL 10
 
@@ -2809,6 +2882,28 @@ static int slub_min_objects;
  * requested a higher mininum order then we start with that one instead of
  * the smallest order which will fit the object.
  */
+/* IAMROOT-12 fehead (2016-12-10):
+ * --------------------------
+ * 슬랩 객체 크기가 주어진 경우 할당 order를 계산합니다.
+ *
+ * 할당 order는 성능 및 기타 시스템 구성 요소에 중요한 영향을 미칩니다. 일반적으
+ * 로 order 0은 페이지 할당 자에서 단편화를 일으키지 않으므로 order 0 할당이 선호
+ * 됩니다. 큰 object는 너무 많은 미사용 공간이 남아있을 수 있으므로 0 슬럽를 주
+ * 문하는 데 문제가됩니다. 슬럽의 1/16 이상이 낭비 될 경우 더 높은 order로갑니다.
+ *
+ * 만족스러운 성능을 얻으려면 최소한의 오브젝트가 하나의 슬럽에 있어야합니다. 그
+ * 렇지 않으면 우리는 list_lock을 취해야하는 partial list에 너무 많은 활동을 생성
+ * 할 수 있습니다. 이것은 거의 사용되지 않는 대형 슬럽에 대한 관심사입니다.
+ *
+ * slub_max_order는 슬럽에있는 객체의 수를 critical로 간주하기 시작하는 order를
+ * 지정합니다. slub_max_order에 도달하면 페이지 order를 가능한 한 낮게 유지하려고
+ * 시도합니다. 따라서 우리는 작은 페이지 order를 선호하여 더 많은 공간을 낭비합니
+ * 다.
+ *
+ * 고차 배분은 또한 슬럽에 더 많은 오브젝트를 배치 할 수 있으므로 오브젝트 처리
+ * 오버 헤드를 줄일 수 있습니다. 사용자가 더 높은 최소 order를 요청한 경우, 가장
+ * 작은 order 대신 해당 항목에 적합한 시작으로 시작합니다.
+ */
 static inline int slab_order(int size, int min_objects,
 				int max_order, int fract_leftover, int reserved)
 {
@@ -2853,12 +2948,24 @@ static inline int calculate_order(int size, int reserved)
 	 * First we reduce the acceptable waste in a slab. Then
 	 * we reduce the minimum objects required in a slab.
 	 */
+	/* IAMROOT-12 fehead (2016-12-10):
+	 * --------------------------
+	 * min_objects = 0
+	 */
 	min_objects = slub_min_objects;
 	if (!min_objects)
+		/* IAMROOT-12 fehead (2016-12-10):
+		 * --------------------------
+		 * pi2 : 4 * (fls(4) + 1) = 4 * (3+1) 16
+		 */
 		min_objects = 4 * (fls(nr_cpu_ids) + 1);
 	max_objects = order_objects(slub_max_order, size, reserved);
 	min_objects = min(min_objects, max_objects);
 
+	/* IAMROOT-12 fehead (2016-12-10):
+	 * --------------------------
+	 * min_objects = 0x10
+	 */
 	while (min_objects > 1) {
 		fraction = 16;
 		while (fraction >= 4) {
@@ -3006,6 +3113,10 @@ static int init_kmem_cache_nodes(struct kmem_cache *s)
 
 static void set_min_partial(struct kmem_cache *s, unsigned long min)
 {
+	/* IAMROOT-12 fehead (2016-12-10):
+	 * --------------------------
+	 * MIN_PARTIAL=5, MAX_PARTIAL= 10
+	 */
 	if (min < MIN_PARTIAL)
 		min = MIN_PARTIAL;
 	else if (min > MAX_PARTIAL)
@@ -3017,8 +3128,17 @@ static void set_min_partial(struct kmem_cache *s, unsigned long min)
  * calculate_sizes() determines the order and the distribution of data within
  * a slab object.
  */
+/* IAMROOT-12 fehead (2016-12-10):
+ * --------------------------
+ * calculate_sizes()는 slab 객체 내에서 데이터의 순서와 분포를 결정합니다.
+ */
 static int calculate_sizes(struct kmem_cache *s, int forced_order)
 {
+	/* IAMROOT-12 fehead (2016-12-10):
+	 * --------------------------
+	 * flags = 0x2000
+	 * size = 0x20
+	 */
 	unsigned long flags = s->flags;
 	unsigned long size = s->object_size;
 	int order;
@@ -3127,6 +3247,11 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 	return !!oo_objects(s->oo);
 }
 
+/* IAMROOT-12 fehead (2016-12-10):
+ * --------------------------
+ * __kmem_cache_create (s=&boot_kmem_cache_node, flags=0x2000)
+ *	kmem_cache_open (s=&boot_kmem_cache_node, flags=0x2000)
+ */
 static int kmem_cache_open(struct kmem_cache *s, unsigned long flags)
 {
 /* IAMROOT-12:
@@ -3156,6 +3281,10 @@ static int kmem_cache_open(struct kmem_cache *s, unsigned long flags)
 
 #if defined(CONFIG_HAVE_CMPXCHG_DOUBLE) && \
     defined(CONFIG_HAVE_ALIGNED_STRUCT_PAGE)
+	/* IAMROOT-12 fehead (2016-12-10):
+	 * --------------------------
+	 * pi2에서 실행 안됨
+	 */
 	if (system_has_cmpxchg_double() && (s->flags & SLAB_DEBUG_FLAGS) == 0)
 		/* Enable fast mode */
 		s->flags |= __CMPXCHG_DOUBLE;
@@ -3164,6 +3293,10 @@ static int kmem_cache_open(struct kmem_cache *s, unsigned long flags)
 	/*
 	 * The larger the object size is, the more pages we want on the partial
 	 * list to avoid pounding the page allocator excessively.
+	 */
+	/* IAMROOT-12 fehead (2016-12-10):
+	 * --------------------------
+	 * s->min_partial = 5
 	 */
 	set_min_partial(s, ilog2(s->size) / 2);
 
@@ -3183,6 +3316,23 @@ static int kmem_cache_open(struct kmem_cache *s, unsigned long flags)
 	 * B) The number of objects in cpu partial slabs to extract from the
 	 *    per node list when we run out of per cpu objects. We only fetch
 	 *    50% to keep some capacity around for frees.
+	 */
+	/* IAMROOT-12 fehead (2016-12-10):
+	 * --------------------------
+	 * cpu_partial은 프로세서의 CPU 별 partial 목록에 보관되는 객체의 최대
+	 * 개수를 결정합니다.
+	 *
+	 * Per cpu partial 목록에는 주로 하나의 객체가 해제 된 슬랩이 포함됩니다.
+	 * 할당에 사용되는 경우 최소의 노력으로 다시 채울 수 있습니다. 슬랩은 노
+	 * 드 별 partial 목록에 절대 도달하지 않으므로 잠금이 필요하지 않습니다.
+	 *
+	 * 이 설정은 또한
+	 * 
+	 * A) 한계에 도달하면 노드 목록 당 덤프 된 CPU 당 partial 슬랩의 오브젝
+	 * 트 수입니다.
+	 * B) CPU 당 partial 객체가 부족할 때 노드 목록에서 추출 할 cpu partial
+	 *  슬랩의 객체 수입니다. 우리는 자유를 위해 약간의 수용력을 유지하기
+	 *  위해 50% 만 가져옵니다.
 	 */
 	if (!kmem_cache_has_cpu_partial(s))
 		s->cpu_partial = 0;

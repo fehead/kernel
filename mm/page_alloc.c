@@ -4413,6 +4413,10 @@ static int build_zonelists_node(pg_data_t *pgdat, struct zonelist *zonelist,
 /* zonelist order in the kernel.
  * set_zonelist_order() will set this to NODE or ZONE.
  */
+/* IAMROOT-12 fehead (2016-12-10):
+ * --------------------------
+ #define ZONELIST_ORDER_ZONE     2
+ */
 static int current_zonelist_order = ZONELIST_ORDER_DEFAULT;
 static char zonelist_order_name[3][8] = {"Default", "Node", "Zone"};
 

@@ -268,8 +268,7 @@ struct kmem_cache *find_mergeable(size_t size, size_t align,
 }
 
 /*
- * Figure out what the alignment of the objects will be given a set of
- * flags, a user specified alignment and the size of the objects.
+Figure out what the alignment of the objects will be given a set of flags, a user specified alignment and the size of the objects.
  */
 /* IAMROOT-12 fehead (2016-12-03):
  * --------------------------
@@ -713,16 +712,16 @@ void __init create_boot_cache(struct kmem_cache *s, const char *name, size_t siz
 	s->name = name;
 	s->size = s->object_size = size;
 
-	/* IAMROOT-12 fehead (2016-12-03):
-	 * --------------------------
-	 * flags=SLAB_HWCACHE_ALIGN(8192), ARCH_KMALLOC_MINALIGN=64, size=32
-	 * s->align = 64
-	 */
 
 /* IAMROOT-12:
  * -------------
  * object 정렬 단위를 산출한다.
  */
+	/* IAMROOT-12 fehead (2016-12-03):
+	 * --------------------------
+	 * flags=SLAB_HWCACHE_ALIGN(0x2000), ARCH_KMALLOC_MINALIGN=64, size=32
+	 * s->align = ARCH_KMALLOC_MINALIGN(64)
+	 */
 	s->align = calculate_alignment(flags, ARCH_KMALLOC_MINALIGN, size);
 
 	/* IAMROOT-12 fehead (2016-12-03):

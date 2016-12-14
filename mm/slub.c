@@ -405,6 +405,12 @@ static inline size_t slab_ksize(const struct kmem_cache *s)
  * 예) order=3, size=64, reserved=0 
  *     -> 32K / 64 = 512
  */
+/* IAMROOT-12 fehead (2016-12-14):
+ * --------------------------
+ * order = 3, size=0x40, reserved = 0
+ * order 페이지에 들어갈수 있는 object 개수 산출.
+ * 64byte(size)가 32k(order3 * 4k)에 총 512개가 들어갈수 있다.
+ */
 static inline int order_objects(int order, unsigned long size, int reserved)
 {
 	return ((PAGE_SIZE << order) - reserved) / size;
@@ -2952,6 +2958,10 @@ static int slub_min_objects;
  * 오버 헤드를 줄일 수 있습니다. 사용자가 더 높은 최소 order를 요청한 경우, 가장
  * 작은 order 대신 해당 항목에 적합한 시작으로 시작합니다.
  */
+/* IAMROOT-12 fehead (2016-12-14):
+ * --------------------------
+ * size=64, min_objects=16, max_order=3, fract_leftover=16, reserved=0
+ */
 static inline int slab_order(int size, int min_objects,
 				int max_order, int fract_leftover, int reserved)
 {
@@ -2995,6 +3005,10 @@ static inline int slab_order(int size, int min_objects,
 	return order;
 }
 
+/* IAMROOT-12 fehead (2016-12-14):
+ * --------------------------
+ * size = 0x40, reserved = 0
+ */
 static inline int calculate_order(int size, int reserved)
 {
 	int order;
@@ -3032,16 +3046,18 @@ static inline int calculate_order(int size, int reserved)
 	if (!min_objects)
 		/* IAMROOT-12 fehead (2016-12-10):
 		 * --------------------------
-		 * pi2 : 4 * (fls(4) + 1) = 4 * (3+1) 16
+		 * pi2 : 4 * (fls(4) + 1) = 4 * (3+1) = 16
 		 */
 		min_objects = 4 * (fls(nr_cpu_ids) + 1);
+	/* IAMROOT-12 fehead (2016-12-14):
+	 * --------------------------
+	 * slub_max_order = 3, size=0x40, reserved = 0
+	 * max_objects = order_objects(3, 64, 0) = 512
+	 * min_objects = min(16, 512) = 16
+	 */
 	max_objects = order_objects(slub_max_order, size, reserved);
 	min_objects = min(min_objects, max_objects);
 
-	/* IAMROOT-12 fehead (2016-12-10):
-	 * --------------------------
-	 * min_objects = 0x10
-	 */
 /* IAMROOT-12:
  * -------------
  * 의도: 낭비 되는 구간이 적으면 가능하면 min_objects가 큰 상태(lock 부담 줄이기)에서
@@ -3235,7 +3251,7 @@ static void set_min_partial(struct kmem_cache *s, unsigned long min)
  */
 /* IAMROOT-12 fehead (2016-12-10):
  * --------------------------
- * calculate_sizes()는 slab 객체 내에서 데이터의 순서와 분포를 결정합니다.
+ * calculate_sizes()는 slab 객체 내에서 데이터의 order와 분포를 결정합니다.
  */
 static int calculate_sizes(struct kmem_cache *s, int forced_order)
 {
@@ -3344,6 +3360,10 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
  * -------------
  * 최종 계산된 size 역시 s->align 단위로 정렬되어야 한다.
  */
+/* IAMROOT-12 fehead (2016-12-14):
+ * --------------------------
+ * size = ALIGN(0x20, 0x40) = 0x40
+ */
 	size = ALIGN(size, s->align);
 	s->size = size;
 
@@ -3352,9 +3372,17 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
  * 지정한 order가 없으면 적절히 시스템이 산출해낸다. 
  * (낭비되는 영역을 최소화 시킬 수 있는 알고리즘을 사용한다)
  */
+	/* IAMROOT-12 fehead (2016-12-14):
+	 * --------------------------
+	 * forced_order = -1
+	 */
 	if (forced_order >= 0)
 		order = forced_order;
 	else
+		/* IAMROOT-12 fehead (2016-12-14):
+		 * --------------------------
+		 * size = 0x40, s->reserved = 0
+		 */
 		order = calculate_order(size, s->reserved);
 
 	if (order < 0)
@@ -3408,6 +3436,10 @@ static int kmem_cache_open(struct kmem_cache *s, unsigned long flags)
  * -------------
  * slub 디버거가 동작하는 경우 flag에 사용하는 디버그 플래그 옵션을 추가한다.
  */
+	/* IAMROOT-12 fehead (2016-12-14):
+	 * --------------------------
+	 * s->flags = 0x2000, s->reservied = 0
+	 */
 	s->flags = kmem_cache_flags(s->size, flags, s->name, s->ctor);
 	s->reserved = 0;
 
@@ -4100,8 +4132,8 @@ __kmem_cache_alias(const char *name, size_t size, size_t align,
 
 /* IAMROOT-12 fehead (2016-12-03):
  * --------------------------
- * *s = { size = 0x20, object_size = 0x20, align = 0x40, name = "kmem_cache_node"
- * flags = 0x2000
+ * *s ={ size = 0x20, object_size = 0x20, align = 0x40, name = "kmem_cache_node"
+ * flags = SLAB_HWCACHE_ALIGN(0x2000)
  */
 int __kmem_cache_create(struct kmem_cache *s, unsigned long flags)
 {

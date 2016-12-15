@@ -2961,6 +2961,9 @@ static int slub_min_objects;
 /* IAMROOT-12 fehead (2016-12-14):
  * --------------------------
  * size=64, min_objects=16, max_order=3, fract_leftover=16, reserved=0
+ *	 size	| min_ob| max	| fra	| res	| ret
+ *	--------+-------+-------+-------+-------+-----
+ *	 64	| 16	| 3	| 16	| 0	| 0
  */
 static inline int slab_order(int size, int min_objects,
 				int max_order, int fract_leftover, int reserved)
@@ -2993,7 +2996,7 @@ static inline int slab_order(int size, int min_objects,
 
 /* IAMROOT-12:
  * -------------
- * 낭비되는 공간을 조사해서 작은 경우 break
+ * 낭비되는 공간을 조사해서 적정 사이즈 이하이면 break
  */
 		rem = (slab_size - reserved) % size;
 

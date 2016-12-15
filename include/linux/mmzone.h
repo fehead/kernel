@@ -23,6 +23,10 @@
 #ifndef CONFIG_FORCE_MAX_ZONEORDER
 #define MAX_ORDER 11
 #else
+/* IAMROOT-12 fehead (2016-12-15):
+ * --------------------------
+ * pi2 = 11
+ */
 #define MAX_ORDER CONFIG_FORCE_MAX_ZONEORDER
 #endif
 #define MAX_ORDER_NR_PAGES (1 << (MAX_ORDER - 1))

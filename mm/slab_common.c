@@ -268,7 +268,8 @@ struct kmem_cache *find_mergeable(size_t size, size_t align,
 }
 
 /*
-Figure out what the alignment of the objects will be given a set of flags, a user specified alignment and the size of the objects.
+ * Figure out what the alignment of the objects will be given a set of
+ * flags, a user specified alignment and the size of the objects.
  */
 /* IAMROOT-12 fehead (2016-12-03):
  * --------------------------

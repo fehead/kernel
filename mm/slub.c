@@ -3050,6 +3050,7 @@ static inline int calculate_order(int size, int reserved)
 		/* IAMROOT-12 fehead (2016-12-10):
 		 * --------------------------
 		 * pi2 : 4 * (fls(4) + 1) = 4 * (3+1) = 16
+		 * cpu당 4개씩
 		 */
 		min_objects = 4 * (fls(nr_cpu_ids) + 1);
 	/* IAMROOT-12 fehead (2016-12-14):
@@ -3255,6 +3256,9 @@ static void set_min_partial(struct kmem_cache *s, unsigned long min)
 /* IAMROOT-12 fehead (2016-12-10):
  * --------------------------
  * calculate_sizes()는 slab 객체 내에서 데이터의 order와 분포를 결정합니다.
+ *
+ * s->flags를 참조하여 s->inuse(Object size + 디버그FP size), s->size(object +
+ * debug size) 설정, 적정(s->oo), 최소(s->min), 최대(s->max) slub order를 설정
  */
 static int calculate_sizes(struct kmem_cache *s, int forced_order)
 {
@@ -3399,9 +3403,17 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
  * -------------
  * ZONE_DMA를 사용하게 하는 캐시 플래그
  */
+	/* IAMROOT-12 fehead (2016-12-16):
+	 * --------------------------
+	 * 확인결과 scsi 장비에서 사용.
+	 */
 	if (s->flags & SLAB_CACHE_DMA)
 		s->allocflags |= GFP_DMA;
 
+	/* IAMROOT-12 fehead (2016-12-16):
+	 * --------------------------
+	 * file에 관련된 곳에서 사용.
+	 */
 	if (s->flags & SLAB_RECLAIM_ACCOUNT)
 		s->allocflags |= __GFP_RECLAIMABLE;
 

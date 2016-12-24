@@ -407,8 +407,8 @@ static inline size_t slab_ksize(const struct kmem_cache *s)
  */
 /* IAMROOT-12 fehead (2016-12-14):
  * --------------------------
- * order = 3, size=0x40, reserved = 0
  * order 페이지에 들어갈수 있는 object 개수 산출.
+ * order = 3, size=0x40, reserved = 0
  * 64byte(size)가 32k(order3 * 4k)에 총 512개가 들어갈수 있다.
  */
 static inline int order_objects(int order, unsigned long size, int reserved)
@@ -1311,6 +1311,10 @@ out:
 
 __setup("slub_debug", setup_slub_debug);
 
+/* IAMROOT-12 fehead (2016-12-24):
+ * --------------------------
+ * CONFIG_SLUB_DEBUG enable 시 작동 하며 pi2 기본은 disable
+ */
 unsigned long kmem_cache_flags(unsigned long object_size,
 	unsigned long flags, const char *name,
 	void (*ctor)(void *))
@@ -3408,6 +3412,7 @@ static void set_min_partial(struct kmem_cache *s, unsigned long min)
  * --------------------------
  * calculate_sizes()는 slab 객체 내에서 데이터의 order와 분포를 결정합니다.
  *
+ * forced_order 가 -1이면 slub order값 자동 계산.
  * s->flags를 참조하여 s->inuse(Object size + 디버그FP size), s->size(object +
  * debug size) 설정, 적정(s->oo), 최소(s->min), 최대(s->max) slub order를 설정
  */

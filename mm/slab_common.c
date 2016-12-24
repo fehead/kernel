@@ -740,6 +740,10 @@ void __init create_boot_cache(struct kmem_cache *s, const char *name, size_t siz
 	s->refcount = -1;	/* Exempt from merging for now */
 }
 
+/* IAMROOT-12 fehead (2016-12-17):
+ * --------------------------
+ * name = NULL, size = {64, 128, 128, 256, 512, 1024, 2048, 4096, 8192}, flags
+ */
 struct kmem_cache *__init create_kmalloc_cache(const char *name, size_t size,
 				unsigned long flags)
 {
@@ -754,6 +758,24 @@ struct kmem_cache *__init create_kmalloc_cache(const char *name, size_t size,
 	return s;
 }
 
+/* IAMROOT-12 fehead (2016-12-17):
+ * --------------------------
+ * pi2
+ * [0] = 0
+ * [1] = 0
+ * [2] = create_kmalloc_cache("kmalloc-192",192, flags);
+ * [3] = 0
+ * [4] = 0
+ * [5] = 0
+ * [6] = create_kmalloc_cache("kmalloc-64", 64, flags);
+ * [7] = create_kmalloc_cache("kmalloc-128", 128, flags);
+ * [8] = create_kmalloc_cache("kmalloc-256", 256, flags);
+ * [9] = create_kmalloc_cache("kmalloc-512", 512, flags);
+ * [10] = create_kmalloc_cache("kmalloc-1024", 1024, flags);
+ * [11] = create_kmalloc_cache("kmalloc-2048", 2048, flags);
+ * [12] = create_kmalloc_cache("kmalloc-4096", 4096, flags);
+ * [13] = create_kmalloc_cache("kmalloc-8192", 8192, flags);
+ */
 struct kmem_cache *kmalloc_caches[KMALLOC_SHIFT_HIGH + 1];
 EXPORT_SYMBOL(kmalloc_caches);
 
@@ -767,6 +789,13 @@ EXPORT_SYMBOL(kmalloc_dma_caches);
  * kmalloc array. This is necessary for slabs < 192 since we have non power
  * of two cache sizes there. The size of larger slabs can be determined using
  * fls.
+ */
+/* IAMROOT-12 fehead (2016-12-17):
+ * --------------------------
+ * pi2:
+ * size_index[0-7] = KMALLOC_SHIFT_LOW(6) - 64;
+ * size_index[8~11] = 7 (128)
+ * size_index[16-23] = 8 (256)
  */
 static s8 size_index[24] = {
 	3,	/* 8 */
@@ -852,6 +881,10 @@ void __init create_kmalloc_caches(unsigned long flags)
 	BUILD_BUG_ON(KMALLOC_MIN_SIZE > 256 ||
 		(KMALLOC_MIN_SIZE & (KMALLOC_MIN_SIZE - 1)));
 
+	/* IAMROOT-12 fehead (2016-12-17):
+	 * --------------------------
+	 * size_index[0-7] = 6(64)
+	 */
 	for (i = 8; i < KMALLOC_MIN_SIZE; i += 8) {
 		int elem = size_index_elem(i);
 
@@ -860,10 +893,18 @@ void __init create_kmalloc_caches(unsigned long flags)
 		size_index[elem] = KMALLOC_SHIFT_LOW;
 	}
 
+	/* IAMROOT-12 fehead (2016-12-17):
+	 * --------------------------
+	 * pi2 : KMALLOC_MIN_SIZE=64
+	 */
 	if (KMALLOC_MIN_SIZE >= 64) {
 		/*
 		 * The 96 byte size cache is not used if the alignment
 		 * is 64 byte.
+		 */
+		/* IAMROOT-12 fehead (2016-12-17):
+		 * --------------------------
+		 * size_index[8~11] = 7
 		 */
 		for (i = 64 + 8; i <= 96; i += 8)
 			size_index[size_index_elem(i)] = 7;
@@ -876,9 +917,18 @@ void __init create_kmalloc_caches(unsigned long flags)
 		 * is 128 byte. Redirect kmalloc to use the 256 byte cache
 		 * instead.
 		 */
+		/* IAMROOT-12 fehead (2016-12-17):
+		 * --------------------------
+		 * size_index[16-23] = 8
+		 */
 		for (i = 128 + 8; i <= 192; i += 8)
 			size_index[size_index_elem(i)] = 8;
 	}
+
+	/* IAMROOT-12 fehead (2016-12-17):
+	 * --------------------------
+	 * i = 3 ; i < 13 ; i++
+	 */
 	for (i = KMALLOC_SHIFT_LOW; i <= KMALLOC_SHIFT_HIGH; i++) {
 		if (!kmalloc_caches[i]) {
 			kmalloc_caches[i] = create_kmalloc_cache(NULL,

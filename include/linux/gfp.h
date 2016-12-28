@@ -410,6 +410,17 @@ static inline int gfpflags_to_migratetype(const gfp_t gfp_flags)
  * entry #14: BAD  -
  * entry #15: BAD  -
  */
+/* IAMROOT-12 fehead (2016-12-28):
+ * --------------------------
+ * (ZONE_NORMAL << 0 * ZONES_SHIFT)	0 << 0
+ * | (OPT_ZONE_DMA << ___GFP_DMA * ZONES_SHIFT)	0 <<  1 * 1	0
+ * | (OPT_ZONE_HIGHMEM << ___GFP_HIGHMEM * ZONES_SHIFT) 0 << 2 * 1	0
+ * | (OPT_ZONE_DMA32 << ___GFP_DMA32 * ZONES_SHIFT)	0 << 4 * 1	0
+ * | (ZONE_NORMAL << ___GFP_MOVABLE * ZONES_SHIFT)	0 << 8 * 1	0
+ * | (OPT_ZONE_DMA << (___GFP_MOVABLE | ___GFP_DMA) * ZONES_SHIFT) 0 << 9 * 1 0
+ * | (ZONE_MOVABLE << (___GFP_MOVABLE | ___GFP_HIGHMEM) * ZONES_SHIFT) 1 << 10 * 1 0x400
+ * | (OPT_ZONE_DMA32 << (___GFP_MOVABLE | ___GFP_DMA32) * ZONES_SHIFT) 0 << 12 * 1 0
+ */
 #define GFP_ZONE_TABLE ( \
 	(ZONE_NORMAL << 0 * ZONES_SHIFT)				      \
 	| (OPT_ZONE_DMA << ___GFP_DMA * ZONES_SHIFT)			      \

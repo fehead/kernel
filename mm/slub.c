@@ -1444,6 +1444,12 @@ static inline void slab_free_hook(struct kmem_cache *s, void *x)
 /*
  * Slab allocation and freeing
  */
+/* IAMROOT-12 fehead (2016-12-28):
+ * --------------------------
+ * s = kmem_cache_node
+ * flags = GFP_NOWAIT | __GFP_NOWARN | __GFP_NORETRY) & ~__GFP_NOFAIL
+ * node = 0
+ */
 static inline struct page *alloc_slab_page(struct kmem_cache *s,
 		gfp_t flags, int node, struct kmem_cache_order_objects oo)
 {
@@ -1453,6 +1459,10 @@ static inline struct page *alloc_slab_page(struct kmem_cache *s,
 /* IAMROOT-12:
  * -------------
  * object tracking을 금지
+ */
+/* IAMROOT-12 fehead (2016-12-28):
+ * --------------------------
+ * flags = (GFP_NOWAIT | __GFP_NOWARN | __GFP_NORETRY) & ~__GFP_NOFAIL) | __GFP_NOTRACK
  */
 	flags |= __GFP_NOTRACK;
 
@@ -1478,6 +1488,10 @@ static inline struct page *alloc_slab_page(struct kmem_cache *s,
 	return page;
 }
 
+/* IAMROOT-12 fehead (2016-12-28):
+ * --------------------------
+ * allocate_slab(kmem_cache_node, GFP_NOWAIT, 0);
+ */
 static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 {
 	struct page *page;
@@ -1512,6 +1526,10 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 /* IAMROOT-12:
  * -------------
  * 경고출력금지, 2번반복금지, 실패가능으로 플래그 설정을 추가하거나 제거한다.
+ */
+/* IAMROOT-12 fehead (2016-12-28):
+ * --------------------------
+ * alloc_gfp = GFP_NOWAIT | __GFP_NOWARN | __GFP_NORETRY) & ~__GFP_NOFAIL
  */
 	alloc_gfp = (flags | __GFP_NOWARN | __GFP_NORETRY) & ~__GFP_NOFAIL;
 
@@ -1593,6 +1611,10 @@ static void setup_object(struct kmem_cache *s, struct page *page,
 	}
 }
 
+/* IAMROOT-12 fehead (2016-12-28):
+ * --------------------------
+ * new_slab(kmem_cache_node, GFP_NOWAIT, 0);
+ */
 static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
 {
 	struct page *page;
@@ -3264,6 +3286,10 @@ static inline int alloc_kmem_cache_cpus(struct kmem_cache *s)
 	return 1;
 }
 
+/* IAMROOT-12 fehead (2016-12-26):
+ * --------------------------
+ * kmem_cache_node = &boot_kmem_cache_node
+ */
 static struct kmem_cache *kmem_cache_node;
 
 /*
@@ -3356,6 +3382,11 @@ static int init_kmem_cache_nodes(struct kmem_cache *s)
 {
 	int node;
 
+/* IAMROOT-12 fehead (2016-12-26):
+ * --------------------------
+ * pi2
+ * for ( (node) = 0; (node) == 0; (node) = 1)
+ */
 	for_each_node_state(node, N_NORMAL_MEMORY) {
 		struct kmem_cache_node *n;
 

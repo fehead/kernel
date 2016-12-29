@@ -3784,6 +3784,10 @@ retry_cpuset:
  * -------------
  * preferred_zoneref에서 zone_idx(0~3)
  */
+/* IAMROOT-12 fehead (2016-12-29):
+ * --------------------------
+ * pi2: ac.classzone_idx = (ZONE_NORMAL, or ZONE_MOVABLE)
+ */
 	ac.classzone_idx = zonelist_zone_idx(preferred_zoneref);
 
 	/* First allocation attempt */

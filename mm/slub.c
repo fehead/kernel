@@ -1447,7 +1447,7 @@ static inline void slab_free_hook(struct kmem_cache *s, void *x)
 /* IAMROOT-12 fehead (2016-12-28):
  * --------------------------
  * s = kmem_cache_node
- * flags = GFP_NOWAIT | __GFP_NOWARN | __GFP_NORETRY) & ~__GFP_NOFAIL
+ * flags = (GFP_NOWAIT | __GFP_NOWARN | __GFP_NORETRY) & ~__GFP_NOFAIL
  * node = 0
  */
 static inline struct page *alloc_slab_page(struct kmem_cache *s,
@@ -1529,7 +1529,7 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
  */
 /* IAMROOT-12 fehead (2016-12-28):
  * --------------------------
- * alloc_gfp = GFP_NOWAIT | __GFP_NOWARN | __GFP_NORETRY) & ~__GFP_NOFAIL
+ * alloc_gfp = (GFP_NOWAIT | __GFP_NOWARN | __GFP_NORETRY) & ~__GFP_NOFAIL
  */
 	alloc_gfp = (flags | __GFP_NOWARN | __GFP_NORETRY) & ~__GFP_NOFAIL;
 

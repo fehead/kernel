@@ -714,6 +714,10 @@ static inline bool zone_is_empty(struct zone *zone)
 #define DEF_PRIORITY 12
 
 /* Maximum number of zones on a zonelist */
+/* IAMROOT-12 fehead (2016-12-29):
+ * --------------------------
+ * pi2: 2
+ */
 #define MAX_ZONES_PER_ZONELIST (MAX_NUMNODES * MAX_NR_ZONES)
 
 #ifdef CONFIG_NUMA

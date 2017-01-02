@@ -29,6 +29,10 @@
  */
 #define MAX_ORDER CONFIG_FORCE_MAX_ZONEORDER
 #endif
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * MAX_ORDER_NR_PAGES = 1024
+ */
 #define MAX_ORDER_NR_PAGES (1 << (MAX_ORDER - 1))
 
 /*
@@ -392,7 +396,7 @@ enum zone_type {
 	ZONE_MOVABLE,
 /* IAMROOT-12 fehead (2016-10-16):
  * --------------------------
- * 라즈베리파이는 2
+ * 라즈베리파이는 2, ZONE_NORMAL, ZONE_MOVABLE
  */
 	__MAX_NR_ZONES
 };

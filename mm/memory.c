@@ -78,6 +78,10 @@
 #ifndef CONFIG_NEED_MULTIPLE_NODES
 /* use the per-pgdat data instead for discontigmem - mbligh */
 unsigned long max_mapnr;
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * mem_map = contig_page_data.node_mem_map
+ */
 struct page *mem_map;
 
 EXPORT_SYMBOL(max_mapnr);

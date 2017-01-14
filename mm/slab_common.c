@@ -810,7 +810,7 @@ EXPORT_SYMBOL(kmalloc_dma_caches);
 /* IAMROOT-12 fehead (2016-12-17):
  * --------------------------
  * pi2:
- * size_index[0-7] = KMALLOC_SHIFT_LOW(6) - 64;
+ * size_index[0-7] = 6(KMALLOC_SHIFT_LOW) (64);
  * size_index[8~11] = 7 (128)
  * size_index[16-23] = 8 (256)
  */

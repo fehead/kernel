@@ -1842,6 +1842,10 @@ static inline void remove_partial(struct kmem_cache_node *n,
  *
  * Returns a list of objects or NULL if it fails.
  */
+/* IAMROOT-12 fehead (2017-01-14):
+ * --------------------------
+ * int *objects : free(사용할수 있는) objects 개수 반환.
+ */
 static inline void *acquire_slab(struct kmem_cache *s,
 		struct kmem_cache_node *n, struct page *page,
 		int mode, int *objects)
@@ -1861,6 +1865,10 @@ static inline void *acquire_slab(struct kmem_cache *s,
 	counters = page->counters;
 	new.counters = counters;
 	*objects = new.objects - new.inuse;
+	/* IAMROOT-12 fehead (2017-01-14):
+	 * --------------------------
+	 * 첫 페이지 여부.
+	 */
 	if (mode) {
 		new.inuse = page->objects;
 		new.freelist = NULL;
@@ -2238,6 +2246,13 @@ redo:
  * for the cpu using c (or some other guarantee must be there
  * to guarantee no concurrent accesses).
  */
+/* IAMROOT-12 fehead (2017-01-14):
+ * --------------------------
+ * 모든 CPU 부분 슬라브를 고정 해제하십시오.
+ *
+ * 이 함수는 c를 사용하여 cpu에 대해 인터럽트가 비활성화 된 상태에서 호출해야합
+ * 니다 (또는 동시 액세스를 보장하기 위해 다른 보장이 있어야합니다).
+ */
 static void unfreeze_partials(struct kmem_cache *s,
 		struct kmem_cache_cpu *c)
 {
@@ -2308,6 +2323,16 @@ static void unfreeze_partials(struct kmem_cache *s,
  * If we did not find a slot then simply move all the partials to the
  * per node partial list.
  */
+/* IAMROOT-12 fehead (2017-01-14):
+ * --------------------------
+ * 가능한 경우 부분 페이지 슬롯에 고정 된 페이지 (__slab_free)를 넣습니다. 이는
+ * 인터럽트가 비활성화되지 않고 선점이 비활성화되지 않은 상태에서 수행됩니다.
+ * cmpxchg는 정확하며 부분 페이지를 임의의 CPU 부분 슬롯에 놓을 수 있습니다.
+ *
+ * 슬롯을 찾지 못하면 모든 부분을 노드 당 부분 목록으로 이동하십시오.
+ *
+ * drain 1:slub를 free할때 , 0:slub을 할당할때.
+ */
 static void put_cpu_partial(struct kmem_cache *s, struct page *page, int drain)
 {
 #ifdef CONFIG_SLUB_CPU_PARTIAL
@@ -2324,6 +2349,11 @@ static void put_cpu_partial(struct kmem_cache *s, struct page *page, int drain)
 		if (oldpage) {
 			pobjects = oldpage->pobjects;
 			pages = oldpage->pages;
+			/* IAMROOT-12 fehead (2017-01-14):
+			 * --------------------------
+			 * slub를 free 할때 drain가 true로 온다.
+			 * slub free하고 free된 objects개수가 많으면 
+			 */
 			if (drain && pobjects > s->cpu_partial) {
 				unsigned long flags;
 				/*

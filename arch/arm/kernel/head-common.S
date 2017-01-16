@@ -239,6 +239,21 @@ ENDPROC(lookup_processor_type)
  *	. = ALIGN(4); __proc_info_begin = .; *(.proc.info.init) __proc_info_end = .;
  *	}
  */
+/* IAMROOT-12D (2016-01-30):
+ * --------------------------
+ * r4: . 
+ * r5: __proc_info_begin
+ * r6: __proc_info_end
+ *
+ * r3 - r4 => 물리 메모리에서의 Offset을 구한다.
+ *   r3는 __lookup_processor_type_data의 물리주소이고,
+ *   r4는 파일에서의 offset을 가지고 있다.
+ *   두 값의 차이를 구하면 물리메모리에서의 위치를 계산할 수 있는 offset을
+ *   구할 수 있다.
+ *
+ * proc_info_list에서 v7의 cpu 정보를 읽어와 구조체에 담는다.
+ * 이 채워진 구조체 정보의 주소를 r5에 저장한다.
+ */
 __lookup_processor_type:
 	adr	r3, __lookup_processor_type_data
 	ldmia	r3, {r4 - r6}

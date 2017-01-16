@@ -3784,6 +3784,10 @@ retry_cpuset:
  * -------------
  * preferred_zoneref에서 zone_idx(0~3)
  */
+/* IAMROOT-12 fehead (2016-12-29):
+ * --------------------------
+ * pi2: ac.classzone_idx = (ZONE_NORMAL, or ZONE_MOVABLE)
+ */
 	ac.classzone_idx = zonelist_zone_idx(preferred_zoneref);
 
 	/* First allocation attempt */
@@ -4412,6 +4416,10 @@ static int build_zonelists_node(pg_data_t *pgdat, struct zonelist *zonelist,
 
 /* zonelist order in the kernel.
  * set_zonelist_order() will set this to NODE or ZONE.
+ */
+/* IAMROOT-12 fehead (2016-12-10):
+ * --------------------------
+ #define ZONELIST_ORDER_ZONE     2
  */
 static int current_zonelist_order = ZONELIST_ORDER_DEFAULT;
 static char zonelist_order_name[3][8] = {"Default", "Node", "Zone"};
@@ -6009,6 +6017,11 @@ static unsigned long __meminit zone_absent_pages_in_node(int nid,
 }
 
 #else /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * pi2: return zone_size[0]
+ * zones_size = {0x3c000, 0x0}
+ */
 static inline unsigned long __meminit zone_spanned_pages_in_node(int nid,
 					unsigned long zone_type,
 					unsigned long node_start_pfn,
@@ -6040,6 +6053,12 @@ static inline unsigned long __meminit zone_absent_pages_in_node(int nid,
 
 #endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
 
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * 빈공간를 포함한 페이지 사이즈(pgdat->spanned_pages)와
+ * 실재 메모리 페이지 사이즈(pgdat->present_pages)를 구한다.
+ * (&contig_page_data, 0, 0, {0x3c000, 0x0}, {0x0, 0x0})
+ */
 static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
 						unsigned long node_start_pfn,
 						unsigned long node_end_pfn,
@@ -6054,7 +6073,18 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
  * 지정된 노드에서 zone별로 spanned_pages(hole을 포함한)를 산출한다.
  * 산출하여 노드->node_spanned_pages에 저장한다.
  */
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * i= ZONE_NORMAL ~ ZONE_MOVABLE
+	 */
 	for (i = 0; i < MAX_NR_ZONES; i++)
+		/* IAMROOT-12 fehead (2017-01-02):
+		 * --------------------------
+		 * zones_size = {0x3c000, 0x0}
+		 * totalpages += zones_size[0]
+		 * totalpages += zones_size[1]
+		 * totalpages = 0x3c000
+		 */
 		totalpages += zone_spanned_pages_in_node(pgdat->node_id, i,
 							 node_start_pfn,
 							 node_end_pfn,
@@ -6067,12 +6097,22 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
  * 산출하고 realtotalpages에서 감소시킨다.
  * 산출하여 노드->node_present_pages에 저장한다.
  */
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * realtotalpages = 0x3c000, zholes_size = {0x0, 0x0}
+	 * realtotalpages -= zholes_size[0]
+	 * realtotalpages -= zholes_size[1]
+	 */
 	realtotalpages = totalpages;
 	for (i = 0; i < MAX_NR_ZONES; i++)
 		realtotalpages -=
 			zone_absent_pages_in_node(pgdat->node_id, i,
 						  node_start_pfn, node_end_pfn,
 						  zholes_size);
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * realtotalpages = 0x3c000
+	 */
 	pgdat->node_present_pages = realtotalpages;
 	printk(KERN_DEBUG "On node %d totalpages: %lu\n", pgdat->node_id,
 							realtotalpages);
@@ -6208,11 +6248,19 @@ static unsigned long __paginginit calc_memmap_size(unsigned long spanned_pages,
  *
  * NOTE: pgdat should get zeroed by caller.
  */
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * (&contig_page_data, 0, 0, {0x3c000, 0x0}, {0x0, 0x0})
+ */
 static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 		unsigned long node_start_pfn, unsigned long node_end_pfn,
 		unsigned long *zones_size, unsigned long *zholes_size)
 {
 	enum zone_type j;
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * nid = 0, zone_start_pfn = 0
+	 */
 	int nid = pgdat->node_id;
 	unsigned long zone_start_pfn = pgdat->node_start_pfn;
 	int ret;
@@ -6238,6 +6286,10 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 	pgdat_page_ext_init(pgdat);
 
 	for (j = 0; j < MAX_NR_ZONES; j++) {
+		/* IAMROOT-12 fehead (2017-01-02):
+		 * --------------------------
+		 * zone = contig_page_data.node_zones[0-1]
+		 */
 		struct zone *zone = pgdat->node_zones + j;
 		unsigned long size, realsize, freesize, memmap_pages;
 
@@ -6403,6 +6455,12 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 	}
 }
 
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * 총 페이지 개수만큼 struct page를 할당하여 pgdat->node_mem_map에 할당하고
+ * 전역변수 mem_map에도 포인팅.
+ * pgdat = &contig_page_data
+ */
 static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
 {
 	/* Skip empty nodes */
@@ -6416,6 +6474,10 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
  */
 #ifdef CONFIG_FLAT_NODE_MEM_MAP
 	/* ia64 gets its own node_mem_map, before this, without bootmem */
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * contig_page_data.node_mem_map = 0
+	 */
 	if (!pgdat->node_mem_map) {
 		unsigned long size, start, end;
 		struct page *map;
@@ -6431,6 +6493,13 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
  * 지정된 노드의 범위를 mem_map으로 만들 때 mem_map[]의 갯수가 
  * 1024개 페이지 단위로 정렬한다. 
  */
+		/* IAMROOT-12 fehead (2017-01-02):
+		 * --------------------------
+		 * start = 0
+		 * end = 0x3c000
+		 * size = 0x3c000 * 0x24(36) = 0x870000(8847360, 8.44M)
+		 * map = NULL
+		 */
 		start = pgdat->node_start_pfn & ~(MAX_ORDER_NR_PAGES - 1);
 		end = pgdat_end_pfn(pgdat);
 		end = ALIGN(end, MAX_ORDER_NR_PAGES);
@@ -6466,9 +6535,17 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
 #endif /* CONFIG_FLAT_NODE_MEM_MAP */
 }
 
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * nid = 0, zone_size = {0x3c000, 0x0}, node_start_pfn = 0, zhole_size = {0x0, 0x0}
+ */
 void __paginginit free_area_init_node(int nid, unsigned long *zones_size,
 		unsigned long node_start_pfn, unsigned long *zholes_size)
 {
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * pgdat = &contig_page_data
+	 */
 	pg_data_t *pgdat = NODE_DATA(nid);
 	unsigned long start_pfn = 0;
 	unsigned long end_pfn = 0;
@@ -6476,6 +6553,10 @@ void __paginginit free_area_init_node(int nid, unsigned long *zones_size,
 	/* pg_data_t should be reset to zero when it's allocated */
 	WARN_ON(pgdat->nr_zones || pgdat->classzone_idx);
 
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * contig_page_data.node_id = 0, contig_page_data.node_start_pfn = 0
+	 */
 	pgdat->node_id = nid;
 	pgdat->node_start_pfn = node_start_pfn;
 #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
@@ -6492,6 +6573,10 @@ void __paginginit free_area_init_node(int nid, unsigned long *zones_size,
  * -------------
  * 노드->node_spanned_pages와 노드->node_present_pages를 산출한다.
  */
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * (&contig_page_data, 0, 0, {0x3c000, 0x0}, {0x0, 0x0})
+	 */
 	calculate_node_totalpages(pgdat, start_pfn, end_pfn,
 				  zones_size, zholes_size);
 

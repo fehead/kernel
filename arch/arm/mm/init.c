@@ -222,6 +222,10 @@ void __init setup_dma_zone(const struct machine_desc *mdesc)
 #endif
 }
 
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * min=0x0,  max_low = 0x3c000, max_high = 0x3c000
+ */
 static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
 	unsigned long max_high)
 {
@@ -243,6 +247,10 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
  * -------------
  * 먼저 ZONE_NORMAL 영역에 대한 페이지 수를 계산한다.(hole을 포함)
  */
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * 0x3c000
+	 */
 	zone_size[0] = max_low - min;
 #ifdef CONFIG_HIGHMEM
 
@@ -262,8 +270,16 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
  * -------------
  * 각 ZONE의 hole의 페이지 수를 계산한다.
  */
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * zhole_size = {0x3c000, 0x0}
+	 */
 	memcpy(zhole_size, zone_size, sizeof(zhole_size));
 	for_each_memblock(memory, reg) {
+		/* IAMROOT-12 fehead (2017-01-02):
+		 * --------------------------
+		 * start = 0x0, end = 0x0x3c000
+		 */
 		unsigned long start = memblock_region_memory_base_pfn(reg);
 		unsigned long end = memblock_region_memory_end_pfn(reg);
 
@@ -278,6 +294,10 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
 		}
 #endif
 	}
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * zhole_size = {0x0, 0x0}
+	 */
 
 #ifdef CONFIG_ZONE_DMA
 	/*
@@ -302,6 +322,12 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
  *	zhole_size[]:	zone별로 hole page 갯수
  *	min:		시작 메모리 pfn (노드별)
  */
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * zone_size = {0x3c000, 0x0}
+	 * zhole_size = {0x0, 0x0}
+	 * min = 0
+	 */
 	free_area_init_node(0, zone_size, min, zhole_size);
 }
 
@@ -458,6 +484,10 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
 
 void __init bootmem_init(void)
 {
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * min, max_low, max_high는 해당 주소의 페이지 index. - (vaddr >> 12)
+	 */
 	unsigned long min, max_low, max_high;
 
 /* IAMROOT-12AB:

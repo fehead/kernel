@@ -117,10 +117,19 @@ struct page {
 
 /* IAMROOT-12AB:
  * -------------
- * 페이지 매핑된 경우 증가
+ * 페이지 매핑된 경우 증가, 즉 가상 주소를 가지고 있다는 뜻.
+ * 일반적으로는 매핑 카운트는 -1부터 시작한다.
+ * -128(PAGE_BUDDY_MAPCOUNT_VALUE): __SetPageBuddy()에서 설정.
+ * -256(PAGE_BALLOON_MAPCOUNT_VALUE): __SetPageBalloon()에서 설정
  */
 					atomic_t _mapcount;
 
+/* IAMROOT-12:
+ * -------------
+ * objects: slub 페이지에서 전체 object 수
+ * inuse:   slub 페이지에서 사용 가능한 object 수
+ * frozen: percpu의 page에서 관리되고 있는 상태
+ */
 					struct { /* SLUB */
 						unsigned inuse:16;
 						unsigned objects:15;

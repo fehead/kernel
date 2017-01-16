@@ -113,6 +113,11 @@ int memblock_debug __initdata_memblock;
 #ifdef CONFIG_MOVABLE_NODE
 bool movable_node_enabled __initdata_memblock = false;
 #endif
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * memblock_allow_resize() 함수에서 호출
+ * memblock_can_resize = 1
+ */
 static int memblock_can_resize __initdata_memblock;
 static int memblock_memory_in_slab __initdata_memblock = 0;
 static int memblock_reserved_in_slab __initdata_memblock = 0;
@@ -1590,6 +1595,10 @@ error:
  *
  * RETURNS:
  * Virtual address of allocated memory block on success, NULL on failure.
+ */
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * pi2
  */
 void * __init memblock_virt_alloc_try_nid_nopanic(
 				phys_addr_t size, phys_addr_t align,

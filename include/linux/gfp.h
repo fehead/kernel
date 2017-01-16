@@ -290,6 +290,11 @@ struct vm_area_struct;
 #define GFP_CONSTRAINT_MASK (__GFP_HARDWALL|__GFP_THISNODE)
 
 /* Do not use these with a slab allocator */
+
+/* IAMROOT-12:
+ * -------------
+ * DMA32와 HIGHMEM에서 slub 페이지 할당을 하면 안된다.
+ */
 #define GFP_SLAB_BUG_MASK (__GFP_DMA32|__GFP_HIGHMEM|~__GFP_BITS_MASK)
 
 /* Flag - indicates that the buffer will be suitable for DMA.  Ignored on some
@@ -404,6 +409,17 @@ static inline int gfpflags_to_migratetype(const gfp_t gfp_flags)
  * entry #13: BAD  -
  * entry #14: BAD  -
  * entry #15: BAD  -
+ */
+/* IAMROOT-12 fehead (2016-12-28):
+ * --------------------------
+ * (ZONE_NORMAL << 0 * ZONES_SHIFT)	0 << 0
+ * | (OPT_ZONE_DMA << ___GFP_DMA * ZONES_SHIFT)	0 <<  1 * 1	0
+ * | (OPT_ZONE_HIGHMEM << ___GFP_HIGHMEM * ZONES_SHIFT) 0 << 2 * 1	0
+ * | (OPT_ZONE_DMA32 << ___GFP_DMA32 * ZONES_SHIFT)	0 << 4 * 1	0
+ * | (ZONE_NORMAL << ___GFP_MOVABLE * ZONES_SHIFT)	0 << 8 * 1	0
+ * | (OPT_ZONE_DMA << (___GFP_MOVABLE | ___GFP_DMA) * ZONES_SHIFT) 0 << 9 * 1 0
+ * | (ZONE_MOVABLE << (___GFP_MOVABLE | ___GFP_HIGHMEM) * ZONES_SHIFT) 1 << 10 * 1 0x400
+ * | (OPT_ZONE_DMA32 << (___GFP_MOVABLE | ___GFP_DMA32) * ZONES_SHIFT) 0 << 12 * 1 0
  */
 #define GFP_ZONE_TABLE ( \
 	(ZONE_NORMAL << 0 * ZONES_SHIFT)				      \

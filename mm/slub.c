@@ -114,6 +114,69 @@
  * 			options set. This moves	slab handling out of
  * 			the fast path and disables lockless freelists.
  */
+/* IAMROOT-12 fehead (2016-12-10):
+ * --------------------------
+ * 잠금 명령 :
+ *    1. slab_mutex (글로벌 뮤텍스)
+ *    2. node-> list_lock
+ *    3. slab_lock (page) (몇몇 아치에서만 그리고 디버깅을 위해서)
+ *
+ *    slab_mutex
+ *
+ *    slab_mutex의 역할은 모든 슬랩 목록을 보호하고 주요 메타 데이터 변경 사항을
+ *	슬랩 캐시 구조와 동기화하는 것입니다.
+ *
+ *    slab_lock은 디버깅 및 cmpxchg_double을 수행 할 수없는 아치에서만 사용됩니다.
+ *	페이지 구조체의 두 번째 더블 단어 만 보호합니다. 의미
+ * A. page-> freelist -> 페이지에있는 오브젝트 목록 비우기
+ * B. 페이지 -> 카운터 -> 개체 카운터
+ * C. 페이지 -> 냉동 -> 냉동 상태
+ *
+ *    슬래브가 고정 된 경우 목록 관리가 면제됩니다. 어떤 목록에도 없습니다. 슬랩
+ *    을 동결시킨 프로세서는 페이지에서 목록 작업을 수행 할 수있는 프로세서입니
+ *    다. 다른 프로세서는 객체를 프리리스트에 넣을 수 있지만 슬래브를 동결시킨
+ *    프로세서는 페이지의 프리리스트에서 객체를 검색 할 수있는 유일한 객체입니다.
+ *
+ *    list_lock은 각 노드의 부분 및 전체 목록과 부분 슬랩 카운터를 보호합니다.
+ *    이 경우, 새로운 슬랩은 목록에 추가되거나 제거되지 않으며 부분 슬랩의 수가
+ *    수정되지 않습니다. (슬랩의 총 개수는 목록 잠금을 사용하지 않고 수정할 수있
+ *    는 원자 값입니다.)
+ *
+ *    list_lock은 중앙 집중식 잠금이므로 가능한 한 많이 사용하지 않습니다. SLUB
+ *    이 부분 슬랩을 처리 할 필요가없는 한, 중앙 집중식 잠금없이 작업을 계속할
+ *    수 있습니다. F.e. 슬래브를 채우는 일련의 긴 오브젝트를 할당 할 때 목록 잠
+ *    금이 필요하지 않습니다.
+ *    슬래브 할당자가 irq 컨텍스트에서 안전하게 사용할 수 있도록 할당 및 할당
+ *    해제 중에 인터럽트가 비활성화됩니다. 또한 커널 선점으로 인해 per_cpu 슬랩
+ *    을 처리하는 동안 프로세서가 변경되지 않도록 인터럽트가 비활성화됩니다.
+ *
+ *  SLUB은 각 프로세서에 하나의 슬랩을 할당합니다.
+ *  할당은 cpu 슬랩이라고하는 이러한 슬랩에서만 발생합니다.
+ *
+ *  자유 요소가있는 슬라브는 부분 목록에 보관되며 일반 작업 중에는 전체 슬랩에
+ *  대한 목록이 사용되지 않습니다. 전체 슬래브의 객체가 해제 된 경우 슬래브가 부
+ *  분 목록에 다시 표시됩니다. 그렇지 않으면 우리는 모든 객체를 스캔 할 수 없기
+ *  때문에 우리는 디버깅을 위해 풀 슬랩을 추적합니다.
+ *
+ *  슬랩은 비게 될 때 해방됩니다. 분해 및 설정이 최소화되므로 빠른 해제 및 할당
+ *  을 위해 CPU 캐시 당 페이지 할당자가 필요합니다.
+ *
+ *  LRU 관리에 사용되는 페이지 플래그의 오버로드.
+ *
+ *  PageActive 슬래브가 고정되어 목록 처리에서 제외됩니다.
+ *  즉, 슬랩은 특정 프로세서에 대한 할당을 만족시키는 것과 같은 용도로 사용됩니
+ *  다. 고정 된 상태에서 개체가 슬래브에서 해제 될 수 있지만 slab_free는 일반적
+ *  인 목록 작업을 건너 뜁니다. 슬래브가 더 이상 필요하지 않은 경우 슬래브를 슬
+ *  래브 목록에 통합하는 것은 슬래브를 잡고있는 프로세서에 달려 있습니다.
+ *
+ *  이 플래그를 사용하면 할당에 사용되는 슬래브를 표시 할 수 있습니다. 그런 슬랩
+ *  은 cpu 슬랩이됩니다. cpu 슬랩에는 슬래브 잠금 장치가 필요한 일반 프리리스트
+ *  외에 자유 오브젝트에 대한 잠금없는 액세스를 허용하는 추가 프리리스트가있을
+ *  수 있습니다.
+ *
+ *  PageError Slab은 디버그 옵션 설정 때문에 특별한 처리가 필요합니다. 이렇게하
+ *  면 슬래브 처리가 빠른 경로에서 벗어나 잠금이없는 프리리스트가 비활성화됩니다.
+ */
 
 static inline int kmem_cache_debug(struct kmem_cache *s)
 {
@@ -124,6 +187,11 @@ static inline int kmem_cache_debug(struct kmem_cache *s)
 #endif
 }
 
+/* IAMROOT-12:
+ * -------------
+ * Slub 할당자를 구성 시 cpu partial을 사용하지 않는 경우에는 항상 false 
+ * slub 캐시가 디버그 플래그를 사용하는 경우에도 false
+ */
 static inline bool kmem_cache_has_cpu_partial(struct kmem_cache *s)
 {
 #ifdef CONFIG_SLUB_CPU_PARTIAL
@@ -151,12 +219,22 @@ static inline bool kmem_cache_has_cpu_partial(struct kmem_cache *s)
  * Mininum number of partial slabs. These will be left on the partial
  * lists even if they are empty. kmem_cache_shrink may reclaim them.
  */
+/* IAMROOT-12 fehead (2016-12-10):
+ * --------------------------
+ * partial slabs의 최소 개수. 비어있는 경우에도 partial 목록에 남습니다.
+ * kmem_cache shrink가 그들을 되 찾을 수 있습니다.
+ */
 #define MIN_PARTIAL 5
 
 /*
  * Maximum number of desirable partial slabs.
  * The existence of more partial slabs makes kmem_cache_shrink
  * sort the partial list by the number of objects in use.
+ */
+/* IAMROOT-12 fehead (2016-12-10):
+ * --------------------------
+ * 원하는 partial slabs의 최대 수입니다. 더 많은 partial slabs가 존재하면
+ * kmem_cache_shrink는 partial 목록을 사용중인 객체의 수만큼 정렬합니다.
  */
 #define MAX_PARTIAL 10
 
@@ -172,6 +250,12 @@ static inline bool kmem_cache_has_cpu_partial(struct kmem_cache *s)
 
 #define OO_SHIFT	16
 #define OO_MASK		((1 << OO_SHIFT) - 1)
+
+/* IAMROOT-12:
+ * -------------
+ * object를 관리하는 page.objects가 15 비트로 제한되어 페이지당 최대 32767개
+ * 까지 관리하게 한다.
+ */
 #define MAX_OBJS_PER_PAGE	32767 /* since page.objects is u15 */
 
 /* Internal SLUB flags */
@@ -244,6 +328,10 @@ static inline int check_valid_pointer(struct kmem_cache *s,
 
 static inline void *get_freepointer(struct kmem_cache *s, void *object)
 {
+/* IAMROOT-12:
+ * -------------
+ * slub 디버그 정보 사용 시 FP가 뒤로 offset 만큼 이동한다.
+ */
 	return *(void **)(object + s->offset);
 }
 
@@ -308,11 +396,30 @@ static inline size_t slab_ksize(const struct kmem_cache *s)
 	return s->size;
 }
 
+
+/* IAMROOT-12:
+ * -------------
+ * 지정된 order 페이지에서 reserved 사이즈를 제외한 공간을 size로 나누어 
+ * 사용할 수 있는 object 갯 수가 산출된다.
+ *
+ * 예) order=3, size=64, reserved=0 
+ *     -> 32K / 64 = 512
+ */
+/* IAMROOT-12 fehead (2016-12-14):
+ * --------------------------
+ * order 페이지에 들어갈수 있는 object 개수 산출.
+ * order = 3, size=0x40, reserved = 0
+ * 64byte(size)가 32k(order3 * 4k)에 총 512개가 들어갈수 있다.
+ */
 static inline int order_objects(int order, unsigned long size, int reserved)
 {
 	return ((PAGE_SIZE << order) - reserved) / size;
 }
 
+/* IAMROOT-12:
+ * -------------
+ * 좌측은 order, 우측 16비트는 object 수
+ */
 static inline struct kmem_cache_order_objects oo_make(int order,
 		unsigned long size, int reserved)
 {
@@ -323,11 +430,19 @@ static inline struct kmem_cache_order_objects oo_make(int order,
 	return x;
 }
 
+/* IAMROOT-12:
+ * -------------
+ * order 값만 반환
+ */
 static inline int oo_order(struct kmem_cache_order_objects x)
 {
 	return x.x >> OO_SHIFT;
 }
 
+/* IAMROOT-12:
+ * -------------
+ * object 수만 반환
+ */
 static inline int oo_objects(struct kmem_cache_order_objects x)
 {
 	return x.x & OO_MASK;
@@ -995,6 +1110,11 @@ static inline unsigned long node_nr_slabs(struct kmem_cache_node *n)
 
 static inline void inc_slabs_node(struct kmem_cache *s, int node, int objects)
 {
+/* IAMROOT-12:
+ * -------------
+ * 요청 slub 캐시의 노드에 slub 페이지가 추가되었음을 나타낸다.
+ * (지정 노드의 slub 페이지 증가, 지정 노드의 전체 object 수 갱신)
+ */
 	struct kmem_cache_node *n = get_node(s, node);
 
 	/*
@@ -1191,6 +1311,10 @@ out:
 
 __setup("slub_debug", setup_slub_debug);
 
+/* IAMROOT-12 fehead (2016-12-24):
+ * --------------------------
+ * CONFIG_SLUB_DEBUG enable 시 작동 하며 pi2 기본은 disable
+ */
 unsigned long kmem_cache_flags(unsigned long object_size,
 	unsigned long flags, const char *name,
 	void (*ctor)(void *))
@@ -1198,6 +1322,15 @@ unsigned long kmem_cache_flags(unsigned long object_size,
 	/*
 	 * Enable debugging if selected on the kernel commandline.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * CONFIG_SLUB_DEBUG_ON 커널 옵션을 사용하는 경우 default로 
+ * SLAB_DEBUG_FREE | SLAB_RED_ZONE | SLAB_POISON | SLAB_STORE_USER 옵션이 주어진다.
+ *
+ * "slub_debug=" 커널 파라메터로 다른 옵션을 추가할 수 있다.
+ */
+
 	if (slub_debug && (!slub_debug_slabs || (name &&
 		!strncmp(slub_debug_slabs, name, strlen(slub_debug_slabs)))))
 		flags |= slub_debug;
@@ -1267,6 +1400,11 @@ static inline struct kmem_cache *slab_pre_alloc_hook(struct kmem_cache *s,
 	lockdep_trace_alloc(flags);
 	might_sleep_if(flags & __GFP_WAIT);
 
+/* IAMROOT-12:
+ * -------------
+ * fault injection 기능으로 설정된 조건을 만족하는 경우 강제로 true가 반환되는데 
+ * 이럴 때 null을 리턴하여 할당을 실패하게 한다.
+ */
 	if (should_failslab(s->object_size, flags, s->flags))
 		return NULL;
 
@@ -1311,14 +1449,32 @@ static inline void slab_free_hook(struct kmem_cache *s, void *x)
 /*
  * Slab allocation and freeing
  */
+/* IAMROOT-12 fehead (2016-12-28):
+ * --------------------------
+ * s = kmem_cache_node
+ * flags = (GFP_NOWAIT | __GFP_NOWARN | __GFP_NORETRY) & ~__GFP_NOFAIL
+ * node = 0
+ */
 static inline struct page *alloc_slab_page(struct kmem_cache *s,
 		gfp_t flags, int node, struct kmem_cache_order_objects oo)
 {
 	struct page *page;
 	int order = oo_order(oo);
 
+/* IAMROOT-12:
+ * -------------
+ * object tracking을 금지
+ */
+/* IAMROOT-12 fehead (2016-12-28):
+ * --------------------------
+ * flags = (GFP_NOWAIT | __GFP_NOWARN | __GFP_NORETRY) & ~__GFP_NOFAIL) | __GFP_NOTRACK
+ */
 	flags |= __GFP_NOTRACK;
 
+/* IAMROOT-12:
+ * -------------
+ * order 페이지만큼 할당하는데 memcg 한계치 제한이 걸리면 null로 반환
+ */
 	if (memcg_charge_slab(s, flags, order))
 		return NULL;
 
@@ -1327,33 +1483,72 @@ static inline struct page *alloc_slab_page(struct kmem_cache *s,
 	else
 		page = alloc_pages_exact_node(node, flags, order);
 
+/* IAMROOT-12:
+ * -------------
+ * 페이지 할당이 실패한 경우 memcg에 전달한 사용량(account)를 다시 감소시킨다.
+ */
 	if (!page)
 		memcg_uncharge_slab(s, order);
 
 	return page;
 }
 
+/* IAMROOT-12 fehead (2016-12-28):
+ * --------------------------
+ * allocate_slab(kmem_cache_node, GFP_NOWAIT, 0);
+ */
 static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 {
 	struct page *page;
+
+/* IAMROOT-12:
+ * -------------
+ * 권장 order + objects 수
+ */
 	struct kmem_cache_order_objects oo = s->oo;
 	gfp_t alloc_gfp;
 
+/* IAMROOT-12:
+ * -------------
+ * bootup 타임에만 io, fs, wait 플래그가 제거된다.
+ */
 	flags &= gfp_allowed_mask;
 
 	if (flags & __GFP_WAIT)
 		local_irq_enable();
 
+/* IAMROOT-12:
+ * -------------
+ * 캐시에 설정된 할당 플래그를 현재 플래그에 추가한다.
+ */
 	flags |= s->allocflags;
 
 	/*
 	 * Let the initial higher-order allocation fail under memory pressure
 	 * so we fall-back to the minimum order allocation.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * 경고출력금지, 2번반복금지, 실패가능으로 플래그 설정을 추가하거나 제거한다.
+ */
+/* IAMROOT-12 fehead (2016-12-28):
+ * --------------------------
+ * alloc_gfp = (GFP_NOWAIT | __GFP_NOWARN | __GFP_NORETRY) & ~__GFP_NOFAIL
+ */
 	alloc_gfp = (flags | __GFP_NOWARN | __GFP_NORETRY) & ~__GFP_NOFAIL;
 
+/* IAMROOT-12:
+ * -------------
+ * 권장 order로 페이지 할당을 시도한다.
+ */
 	page = alloc_slab_page(s, alloc_gfp, node, oo);
 	if (unlikely(!page)) {
+
+/* IAMROOT-12:
+ * -------------
+ * 페이지 할당이 실패한 경우 다시 최소 order를 사용하여 페이지 할당을 시도한다.
+ */
 		oo = s->min;
 		alloc_gfp = flags;
 		/*
@@ -1362,10 +1557,20 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 		 */
 		page = alloc_slab_page(s, alloc_gfp, node, oo);
 
+/* IAMROOT-12:
+ * -------------
+ * 최소 오더로 페이지 할당이 된 경우 ORDER_FALLBACK 카운터를 증가시킨다.
+ * (이 값이 증가되면 slub 페이지 할당 시 high order 페이지 할당에 문제가 
+ * 발생하였다는 것을 알 수 있다.)
+ */
 		if (page)
 			stat(s, ORDER_FALLBACK);
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * kmemcheck 디버깅: 초기화되지 않은 메모리의 사용을 trap
+ */
 	if (kmemcheck_enabled && page
 		&& !(s->flags & (SLAB_NOTRACK | DEBUG_DEFAULT_FLAGS))) {
 		int pages = 1 << oo_order(oo);
@@ -1387,6 +1592,10 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 	if (!page)
 		return NULL;
 
+/* IAMROOT-12:
+ * -------------
+ * slab(slub) 페이지가 할당되면 페이지의 objects에 object 수를 대입한다.
+ */
 	page->objects = oo_objects(oo);
 	mod_zone_page_state(page_zone(page),
 		(s->flags & SLAB_RECLAIM_ACCOUNT) ?
@@ -1407,6 +1616,10 @@ static void setup_object(struct kmem_cache *s, struct page *page,
 	}
 }
 
+/* IAMROOT-12 fehead (2016-12-28):
+ * --------------------------
+ * new_slab(kmem_cache_node, GFP_NOWAIT, 0);
+ */
 static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
 {
 	struct page *page;
@@ -1415,23 +1628,61 @@ static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
 	int order;
 	int idx;
 
+/* IAMROOT-12:
+ * -------------
+ * DMA32와 HIGHMEM에서 slub 페이지 할당을 하면 안된다.
+ */
 	if (unlikely(flags & GFP_SLAB_BUG_MASK)) {
 		pr_emerg("gfp: %u\n", flags & GFP_SLAB_BUG_MASK);
 		BUG();
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * 권장 order (fallback시 최소 order)로 slub 페이지 할당을 한다.
+ */
 	page = allocate_slab(s,
 		flags & (GFP_RECLAIM_MASK | GFP_CONSTRAINT_MASK), node);
 	if (!page)
 		goto out;
 
+
+/* IAMROOT-12:
+ * -------------
+ * 할당된 slub 페이지의 order를 알아온다.
+ */
 	order = compound_order(page);
+
+/* IAMROOT-12:
+ * -------------
+ * 캐시에서 지정된 노드의 slub 페이지 수와 object 수를 추가 갱신한다.
+ */
 	inc_slabs_node(s, page_to_nid(page), page->objects);
+
+/* IAMROOT-12:
+ * -------------
+ * 해당 slub 페이지의 캐시관리자(kmem_cache*) 주소를 지정한다.
+ */
 	page->slab_cache = s;
+
+/* IAMROOT-12:
+ * -------------
+ * Slub 페이지에 Slub 플래그를 설정한다.
+ */
 	__SetPageSlab(page);
+
+/* IAMROOT-12:
+ * -------------
+ * 페이지가 low 워터마크 기준이하에서 비상 메모리를 할당 받은 경우 
+ * page->pfmemalloc이 설정되어 있다. 이러한 경우 Active 플래그를 설정한다.
+ */
 	if (page->pfmemalloc)
 		SetPageSlabPfmemalloc(page);
 
+/* IAMROOT-12:
+ * -------------
+ * 캐시가 SLAB_POISON 디버깅 상태라면 object에 POISON_INUSE(0x5a)를 기록한다.
+ */
 	start = page_address(page);
 
 	if (unlikely(s->flags & SLAB_POISON))
@@ -1439,6 +1690,16 @@ static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
 
 	kasan_poison_slab(page);
 
+/* IAMROOT-12:
+ * -------------
+ * 새로 할당 받은 slub 페이지의 내부 모든 object들은 free 상태이고,
+ * 이들을 모두 FP(Free Pointer)끼리 연결한다. 마지막 object의 FP는
+ * null을 가리키게한다.
+ * FP는 다음 object의 FP가 아니라 object의 처음 위치를 가리킨다.
+ * (디버깅을 사용하지 않으면 FP 위치는 object의 처음이지만 
+ *  디버깅을 사용하는 경우 FP의 위치는 object의 시작 + s->offset 
+ *  만큼 이동한다.)
+ */
 	for_each_object_idx(p, idx, s, start, page->objects) {
 		setup_object(s, page, p);
 		if (likely(idx < page->objects))
@@ -1447,7 +1708,19 @@ static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
 			set_freepointer(s, p, NULL);
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * page->freelist 처음 할당된 slub 페이지의 첫 object를 가리키게한다.
+ */
 	page->freelist = start;
+
+/* IAMROOT-12:
+ * -------------
+ * 처음 할당되지 마자 page->inuse에는 object 수가 담긴다.
+ * --- 새로 할당 받은 slub 페이지에 왜 inuse에 왜 0이 아닌 object 수를?? 모든 object가 cpu_slab->freelist로 이양되기 때문에 모두 사용된 것으로 처리한다.
+ * --- frozen의 역활: cpu_slab->freelist로 free object list의 관리를 넘긴다..
+ *                    (lock없이 atomic operation으로 처리 성능을 높이기 위함)
+ */
 	page->inuse = page->objects;
 	page->frozen = 1;
 out:
@@ -1569,6 +1842,10 @@ static inline void remove_partial(struct kmem_cache_node *n,
  *
  * Returns a list of objects or NULL if it fails.
  */
+/* IAMROOT-12 fehead (2017-01-14):
+ * --------------------------
+ * int *objects : free(사용할수 있는) objects 개수 반환.
+ */
 static inline void *acquire_slab(struct kmem_cache *s,
 		struct kmem_cache_node *n, struct page *page,
 		int mode, int *objects)
@@ -1588,6 +1865,10 @@ static inline void *acquire_slab(struct kmem_cache *s,
 	counters = page->counters;
 	new.counters = counters;
 	*objects = new.objects - new.inuse;
+	/* IAMROOT-12 fehead (2017-01-14):
+	 * --------------------------
+	 * 첫 페이지 여부.
+	 */
 	if (mode) {
 		new.inuse = page->objects;
 		new.freelist = NULL;
@@ -1965,6 +2246,13 @@ redo:
  * for the cpu using c (or some other guarantee must be there
  * to guarantee no concurrent accesses).
  */
+/* IAMROOT-12 fehead (2017-01-14):
+ * --------------------------
+ * 모든 CPU 부분 슬라브를 고정 해제하십시오.
+ *
+ * 이 함수는 c를 사용하여 cpu에 대해 인터럽트가 비활성화 된 상태에서 호출해야합
+ * 니다 (또는 동시 액세스를 보장하기 위해 다른 보장이 있어야합니다).
+ */
 static void unfreeze_partials(struct kmem_cache *s,
 		struct kmem_cache_cpu *c)
 {
@@ -2035,6 +2323,16 @@ static void unfreeze_partials(struct kmem_cache *s,
  * If we did not find a slot then simply move all the partials to the
  * per node partial list.
  */
+/* IAMROOT-12 fehead (2017-01-14):
+ * --------------------------
+ * 가능한 경우 부분 페이지 슬롯에 고정 된 페이지 (__slab_free)를 넣습니다. 이는
+ * 인터럽트가 비활성화되지 않고 선점이 비활성화되지 않은 상태에서 수행됩니다.
+ * cmpxchg는 정확하며 부분 페이지를 임의의 CPU 부분 슬롯에 놓을 수 있습니다.
+ *
+ * 슬롯을 찾지 못하면 모든 부분을 노드 당 부분 목록으로 이동하십시오.
+ *
+ * drain 1:slub를 free할때 , 0:slub을 할당할때.
+ */
 static void put_cpu_partial(struct kmem_cache *s, struct page *page, int drain)
 {
 #ifdef CONFIG_SLUB_CPU_PARTIAL
@@ -2051,6 +2349,11 @@ static void put_cpu_partial(struct kmem_cache *s, struct page *page, int drain)
 		if (oldpage) {
 			pobjects = oldpage->pobjects;
 			pages = oldpage->pages;
+			/* IAMROOT-12 fehead (2017-01-14):
+			 * --------------------------
+			 * slub를 free 할때 drain가 true로 온다.
+			 * slub free하고 free된 objects개수가 많으면 
+			 */
 			if (drain && pobjects > s->cpu_partial) {
 				unsigned long flags;
 				/*
@@ -2270,6 +2573,18 @@ static inline void *get_freelist(struct kmem_cache *s, struct page *page)
 	unsigned long counters;
 	void *freelist;
 
+/* IAMROOT-12:
+ * -------------
+ * page->freelist와 counter를 old 값과 비교하여 동일한 경우 new 값으로 바꾼다
+ * __cmpxchg_double_slab(s, page, old1, old2, new1, new2)
+ *	page->freelist == old1(page->freelist)  
+ *	page->counters == old2(counters)
+ *				page->freelist <- new1(null)
+ *				page->counters <- new2(new.counters)
+ *
+ * 아래 do while 사이를 진행하는 도중  다른 cpu에서 free되어 page->freelist에 object가
+ * 인입되는 경우가 있다.
+ */
 	do {
 		freelist = page->freelist;
 		counters = page->counters;
@@ -2277,6 +2592,10 @@ static inline void *get_freelist(struct kmem_cache *s, struct page *page)
 		new.counters = counters;
 		VM_BUG_ON(!new.frozen);
 
+/* IAMROOT-12:
+ * -------------
+ * 
+ */
 		new.inuse = page->objects;
 		new.frozen = freelist != NULL;
 
@@ -2318,6 +2637,11 @@ static void *__slab_alloc(struct kmem_cache *s, gfp_t gfpflags, int node,
 	 * cpu before disabling interrupts. Need to reload cpu area
 	 * pointer.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * preempt 커널인 경우만 irq를 disable한 후 현재 cpu의 캐시를 다시 알아온다.
+ */
 	c = this_cpu_ptr(s->cpu_slab);
 #endif
 
@@ -2326,12 +2650,28 @@ static void *__slab_alloc(struct kmem_cache *s, gfp_t gfpflags, int node,
 		goto new_slab;
 redo:
 
+/* IAMROOT-12:
+ * -------------
+ * c->page가 지정되어 있는 경우 이 루틴으로 진입한다.
+ *
+ * 아래는 낮은 확률로 c->page가 같은 노드에 없는 경우
+ */
 	if (unlikely(!node_match(page, node))) {
 		int searchnode = node;
 
+/* IAMROOT-12:
+ * -------------
+ * 노드가 지정되었지만 그 노드에는 메모리가 없는 경우(memoryless node)
+ */
 		if (node != NUMA_NO_NODE && !node_present_pages(node))
 			searchnode = node_to_mem_node(node);
 
+/* IAMROOT-12:
+ * -------------
+ * 메모리리스에서 변환한 메모리 노드에서도 매치가 안되는 경우
+ * 현재 cpu 캐시에 있는 미스매치 페이지들을 deactivate 시키고,
+ * c->page와 c->freelist를 null로 초기화
+ */
 		if (unlikely(!node_match(page, searchnode))) {
 			stat(s, ALLOC_NODE_MISMATCH);
 			deactivate_slab(s, page, c->freelist);
@@ -2346,6 +2686,15 @@ redo:
 	 * PFMEMALLOC but right now, we are losing the pfmemalloc
 	 * information when the page leaves the per-cpu allocator
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * pfmemealloc 속성이 서로 다른 페이지인 경우 deactivate...
+ *
+ * slub에서 pfmemalloc을 사용하는 경우는 메모리 부족 시 네트워크 swap을 위해
+ * tcp에 사용되는 메모리를 할당 할 수 있게 하기 위해 준비하였다. (특수 케이스)
+ */
+
 	if (unlikely(!pfmemalloc_match(page, gfpflags))) {
 		deactivate_slab(s, page, c->freelist);
 		c->page = NULL;
@@ -2354,17 +2703,40 @@ redo:
 	}
 
 	/* must check again c->freelist in case of cpu migration or IRQ */
+
+/* IAMROOT-12:
+ * -------------
+ * 인터럽트 disable 전에 preemption되어 cpu 캐시가 다른 페이지로 내용이 바뀔 수 
+ * 있어서 해당 캐시의 freelist를 할당해 줄 수 있는 상태가 될 확률이 있다.
+ */
 	freelist = c->freelist;
 	if (freelist)
 		goto load_freelist;
 
+/* IAMROOT-12:
+ * -------------
+ * c->freelist에 없어서 c->page의 freelist에서 가져온다.
+ */
 	freelist = get_freelist(s, page);
 
+/* IAMROOT-12:
+ * -------------
+ * c->page에서 가져온 freelist가 비어 있는 경우 더 이상 할당할 object가 
+ * 없기 때문에 앞으로 c->partial에서 slub page를 가져와야 한다.
+ * 기존 할당이 다 완료된 페이지는 현재 cpu가 더 이상 관리할 필요가 
+ * 없으므로 frozen이 풀린채로 cpu 캐시의 관리대상에서 벗어난다.(c->page=null)
+ */
 	if (!freelist) {
 		c->page = NULL;
 		stat(s, DEACTIVATE_BYPASS);
 		goto new_slab;
 	}
+
+
+/* IAMROOT-12:
+ * -------------
+ * c->page에 object가 있는 경우 다시 c->freelist에 refill 된다.
+ */
 
 	stat(s, ALLOC_REFILL);
 
@@ -2424,6 +2796,18 @@ new_slab:
  *
  * Otherwise we can simply pick the next object from the lockless free list.
  */
+/* IAMROOT-12 fehead (2017-01-07):
+ * --------------------------
+ * 인라인 된 fastpath이므로 할당 함수 (kmalloc, kmem_cache_alloc)는 fastpath가
+ * 해당 함수로 변환됩니다. 따라서 fastpath에서 만족 될 수있는 요청에 대한 함수
+ * 호출 오버 헤드가 없습니다.
+ *
+ * fastpath는 먼저 잠금없는 여유 목록을 사용할 수 있는지 확인하여 작동합니다.
+ * 그렇지 않으면 느린 처리를 위해 __slab_alloc이 호출됩니다.
+ *
+ * 그렇지 않으면 우리는 간단하게 lockless free리스트에서 다음 객체를 선택할 수
+ * 있습니다.
+ */
 static __always_inline void *slab_alloc_node(struct kmem_cache *s,
 		gfp_t gfpflags, int node, unsigned long addr)
 {
@@ -2432,6 +2816,11 @@ static __always_inline void *slab_alloc_node(struct kmem_cache *s,
 	struct page *page;
 	unsigned long tid;
 
+/* IAMROOT-12:
+ * -------------
+ * fault injection 조건으로 인해 null이 반환되면 할당을 포기한다.
+ * memcg용 kmem_cache를 찾아 가져온다. 없으면 원래 캐시를 사용한다.
+ */
 	s = slab_pre_alloc_hook(s, gfpflags);
 	if (!s)
 		return NULL;
@@ -2446,6 +2835,17 @@ redo:
 	 * the same cpu. It could be different if CONFIG_PREEMPT so we need
 	 * to check if it is matched or not.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * Fastpath alloc slub object
+ *
+ * while 문장이 종료되는 시점까지는 현재 cpu의 캐시 값과 tid 값을 가져온 것을
+ * 보장한다.
+ *
+ * do while 문장은 2줄 사이에서 preemption되지 않음을 보장하나 극히 희박하나
+ * 안정화 목적으로 운용된다.
+ */
 	do {
 		tid = this_cpu_read(s->cpu_slab->tid);
 		c = raw_cpu_ptr(s->cpu_slab);
@@ -2460,6 +2860,11 @@ redo:
 	 * page could be one associated with next tid and our alloc/free
 	 * request will be failed. In this case, we will retry. So, no problem.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * local tid를 보호하기 위해 gcc의 optimization을 하지 않게 한다.
+ */
 	barrier();
 
 	/*
@@ -2471,6 +2876,12 @@ redo:
 
 	object = c->freelist;
 	page = c->page;
+
+/* IAMROOT-12:
+ * -------------
+ * 할당해줄 object가 없거나 현재 가져온 페이지의 노드와 이 cpu 노드가 서로
+ * 다른 경우 slowpath로 할당을 전환한다.
+ */
 	if (unlikely(!object || !node_match(page, node))) {
 		object = __slab_alloc(s, gfpflags, node, addr, c);
 		stat(s, ALLOC_SLOWPATH);
@@ -2491,6 +2902,16 @@ redo:
 		 * against code executing on this cpu *not* from access by
 		 * other cpus.
 		 */
+
+/* IAMROOT-12:
+ * -------------
+ * cmpxchg_double()과 this_cpu_cmpxchg_double()이 다른 점은
+ * 첫 번째와 두 번째 인수를 per-cpu 인수가 사용되며 이렇게 하여 
+ * 현재 cpu 캐시의 tid 값을 알아온다.
+ *
+ * tid: 처음에 cpu 번호로 초기화되나 계속 증가된다. 증가되는 번호가
+ *      cpu끼리 겹칠 수 없게 설계되어 있다.
+ */
 		if (unlikely(!this_cpu_cmpxchg_double(
 				s->cpu_slab->freelist, s->cpu_slab->tid,
 				object, tid,
@@ -2499,6 +2920,12 @@ redo:
 			note_cmpxchg_failure("slab_alloc", s, tid);
 			goto redo;
 		}
+
+/* IAMROOT-12:
+ * -------------
+ * 다음 object에 대한 atomic opeation 작업에 대해 성공 확률을 높이기 위해 
+ * 미리 prefetch한다.
+ */
 		prefetch_freepointer(s, next_object);
 		stat(s, ALLOC_FASTPATH);
 	}
@@ -2519,6 +2946,10 @@ static __always_inline void *slab_alloc(struct kmem_cache *s,
 
 void *kmem_cache_alloc(struct kmem_cache *s, gfp_t gfpflags)
 {
+/* IAMROOT-12:
+ * -------------
+ * slab object를 할당한다.
+ */
 	void *ret = slab_alloc(s, gfpflags, _RET_IP_);
 
 	trace_kmem_cache_alloc(_RET_IP_, ret, s->object_size,
@@ -2728,6 +3159,11 @@ redo:
 	if (likely(page == c->page)) {
 		set_freepointer(s, object, c->freelist);
 
+/* IAMROOT-12:
+ * -------------
+ * this_cpu_cmpxchg_double(pcp1, pcp2, oval1, oval2, nval1, nval2)
+ *	- pcp 값과 oval 값이 같은 경우 nval을 pcp에 대입한다.
+ */
 		if (unlikely(!this_cpu_cmpxchg_double(
 				s->cpu_slab->freelist, s->cpu_slab->tid,
 				c->freelist, tid,
@@ -2771,8 +3207,20 @@ EXPORT_SYMBOL(kmem_cache_free);
  * and increases the number of allocations possible without having to
  * take the list_lock.
  */
+
+/* IAMROOT-12:
+ * -------------
+ * 최대 order를 기본적으로 3으로 하여 최대 8개 페이지를 slub 페이지에 할당할 
+ * 수 있도록 지정한다.
+ */
 static int slub_min_order;
 static int slub_max_order = PAGE_ALLOC_COSTLY_ORDER;
+
+/* IAMROOT-12:
+ * -------------
+ * "slub_min_objects=" 커널 파라메터로 지정하지 않으면 부트업 타임에
+ * 자동으로 계산된다.
+ */
 static int slub_min_objects;
 
 /*
@@ -2800,6 +3248,35 @@ static int slub_min_objects;
  * requested a higher mininum order then we start with that one instead of
  * the smallest order which will fit the object.
  */
+/* IAMROOT-12 fehead (2016-12-10):
+ * --------------------------
+ * 슬랩 객체 크기가 주어진 경우 할당 order를 계산합니다.
+ *
+ * 할당 order는 성능 및 기타 시스템 구성 요소에 중요한 영향을 미칩니다. 일반적으
+ * 로 order 0은 페이지 할당 자에서 단편화를 일으키지 않으므로 order 0 할당이 선호
+ * 됩니다. 큰 object는 너무 많은 미사용 공간이 남아있을 수 있으므로 0 슬럽를 주
+ * 문하는 데 문제가됩니다. 슬럽의 1/16 이상이 낭비 될 경우 더 높은 order로갑니다.
+ *
+ * 만족스러운 성능을 얻으려면 최소한의 오브젝트가 하나의 슬럽에 있어야합니다. 그
+ * 렇지 않으면 우리는 list_lock을 취해야하는 partial list에 너무 많은 활동을 생성
+ * 할 수 있습니다. 이것은 거의 사용되지 않는 대형 슬럽에 대한 관심사입니다.
+ *
+ * slub_max_order는 슬럽에있는 객체의 수를 critical로 간주하기 시작하는 order를
+ * 지정합니다. slub_max_order에 도달하면 페이지 order를 가능한 한 낮게 유지하려고
+ * 시도합니다. 따라서 우리는 작은 페이지 order를 선호하여 더 많은 공간을 낭비합니
+ * 다.
+ *
+ * 고차 배분은 또한 슬럽에 더 많은 오브젝트를 배치 할 수 있으므로 오브젝트 처리
+ * 오버 헤드를 줄일 수 있습니다. 사용자가 더 높은 최소 order를 요청한 경우, 가장
+ * 작은 order 대신 해당 항목에 적합한 시작으로 시작합니다.
+ */
+/* IAMROOT-12 fehead (2016-12-14):
+ * --------------------------
+ * size=64, min_objects=16, max_order=3, fract_leftover=16, reserved=0
+ *	 size	| min_ob| max	| fra	| res	| ret
+ *	--------+-------+-------+-------+-------+-----
+ *	 64	| 16	| 3	| 16	| 0	| 0
+ */
 static inline int slab_order(int size, int min_objects,
 				int max_order, int fract_leftover, int reserved)
 {
@@ -2807,6 +3284,12 @@ static inline int slab_order(int size, int min_objects,
 	int rem;
 	int min_order = slub_min_order;
 
+/* IAMROOT-12:
+ * -------------
+ * 최소 order에서 만들 수 있는 object의 수가 페이지당 최대 오브젝트 수를 
+ * 초과하는 경우에는 size * MAX_OBJS_PER_PAGE로 order 값을 알아온 후 1을
+ * 뺀 값으로 한다. (필요한 max order에서 1을 뺀 크기는 절반의 공간)
+ */
 	if (order_objects(min_order, size, reserved) > MAX_OBJS_PER_PAGE)
 		return get_order(size * MAX_OBJS_PER_PAGE) - 1;
 
@@ -2814,11 +3297,19 @@ static inline int slab_order(int size, int min_objects,
 				fls(min_objects * size - 1) - PAGE_SHIFT);
 			order <= max_order; order++) {
 
+/* IAMROOT-12:
+ * -------------
+ * slab 사이즈가 필요 공간보다 작은 경우 skip 한다.
+ */
 		unsigned long slab_size = PAGE_SIZE << order;
 
 		if (slab_size < min_objects * size + reserved)
 			continue;
 
+/* IAMROOT-12:
+ * -------------
+ * 낭비되는 공간을 조사해서 적정 사이즈 이하이면 break
+ */
 		rem = (slab_size - reserved) % size;
 
 		if (rem <= slab_size / fract_leftover)
@@ -2829,12 +3320,22 @@ static inline int slab_order(int size, int min_objects,
 	return order;
 }
 
+/* IAMROOT-12 fehead (2016-12-14):
+ * --------------------------
+ * size = 0x40, reserved = 0
+ */
 static inline int calculate_order(int size, int reserved)
 {
 	int order;
 	int min_objects;
 	int fraction;
 	int max_objects;
+
+/* IAMROOT-12:
+ * -------------
+ * 계산된 order는 최대한 사용하지 못하는 공간을 최소화 시켜 
+ * 적절한 order로 만들필요가 있다.
+ */
 
 	/*
 	 * Attempt to find best configuration for a slab. This
@@ -2844,12 +3345,40 @@ static inline int calculate_order(int size, int reserved)
 	 * First we reduce the acceptable waste in a slab. Then
 	 * we reduce the minimum objects required in a slab.
 	 */
+	/* IAMROOT-12 fehead (2016-12-10):
+	 * --------------------------
+	 * min_objects = 0
+	 */
 	min_objects = slub_min_objects;
+
+/* IAMROOT-12:
+ * -------------
+ * slub_max_order를 사용하여 min_objects와 max_objects를 산출한다.
+ *
+ * rpi2: fls(4 cpu) = 3
+ *       4 x (3 + 1) = 16개의 min_objects
+ */
 	if (!min_objects)
+		/* IAMROOT-12 fehead (2016-12-10):
+		 * --------------------------
+		 * pi2 : 4 * (fls(4) + 1) = 4 * (3+1) = 16
+		 * cpu당 4개씩
+		 */
 		min_objects = 4 * (fls(nr_cpu_ids) + 1);
+	/* IAMROOT-12 fehead (2016-12-14):
+	 * --------------------------
+	 * slub_max_order = 3, size=0x40, reserved = 0
+	 * max_objects = order_objects(3, 64, 0) = 512
+	 * min_objects = min(16, 512) = 16
+	 */
 	max_objects = order_objects(slub_max_order, size, reserved);
 	min_objects = min(min_objects, max_objects);
 
+/* IAMROOT-12:
+ * -------------
+ * 의도: 낭비 되는 구간이 적으면 가능하면 min_objects가 큰 상태(lock 부담 줄이기)에서
+ *       작은 order를 선택(lock 부담 커짐)한다.
+ */
 	while (min_objects > 1) {
 		fraction = 16;
 		while (fraction >= 4) {
@@ -2882,6 +3411,11 @@ static inline int calculate_order(int size, int reserved)
 static void
 init_kmem_cache_node(struct kmem_cache_node *n)
 {
+/* IAMROOT-12:
+ * -------------
+ * 노드의 partial 리스트에 있는 slub 페이지는 0개로 초기화한다.
+ * list_lock은 partial 리스트를 관리하기 위한 lock이다.
+ */
 	n->nr_partial = 0;
 	spin_lock_init(&n->list_lock);
 	INIT_LIST_HEAD(&n->partial);
@@ -2901,17 +3435,30 @@ static inline int alloc_kmem_cache_cpus(struct kmem_cache *s)
 	 * Must align to double word boundary for the double cmpxchg
 	 * instructions to work; see __pcpu_double_call_return_bool().
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * 캐시의 cpu_slab은 per-cpu로 동적 할당 받아온다.
+ */
 	s->cpu_slab = __alloc_percpu(sizeof(struct kmem_cache_cpu),
 				     2 * sizeof(void *));
 
 	if (!s->cpu_slab)
 		return 0;
 
+/* IAMROOT-12:
+ * -------------
+ * 할당받아온 kmem_cache_cpu 구조체를 초기화한다.
+ */
 	init_kmem_cache_cpus(s);
 
 	return 1;
 }
 
+/* IAMROOT-12 fehead (2016-12-26):
+ * --------------------------
+ * kmem_cache_node = &boot_kmem_cache_node
+ */
 static struct kmem_cache *kmem_cache_node;
 
 /*
@@ -2938,24 +3485,54 @@ static void early_kmem_cache_node_alloc(int node)
 		pr_err("SLUB: Allocating a useless per node structure in order to be able to continue\n");
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * 가장 처음 object를 가리킨다.
+ */
 	n = page->freelist;
 	BUG_ON(!n);
+
+/* IAMROOT-12:
+ * -------------
+ * 첫 object를 할당한다.
+ *	- 처음 object가 가리키는 다음 object 주소를 가져온다.
+ */
 	page->freelist = get_freepointer(kmem_cache_node, n);
 	page->inuse = 1;
 	page->frozen = 0;
+
+/* IAMROOT-12:
+ * -------------
+ * 첫 object를 kmem_cache_node->node[] 구조체가 사용하도록 연결한다.
+ */
 	kmem_cache_node->node[node] = n;
 #ifdef CONFIG_SLUB_DEBUG
 	init_object(kmem_cache_node, n, SLUB_RED_ACTIVE);
 	init_tracking(kmem_cache_node, n);
 #endif
 	kasan_kmalloc(kmem_cache_node, n, sizeof(struct kmem_cache_node));
+
+/* IAMROOT-12:
+ * -------------
+ * kmem_cache_node->node[] 구조체 메모리가 준비되었으므로 이제 초기화
+ */
 	init_kmem_cache_node(n);
+
+/* IAMROOT-12:
+ * -------------
+ * 아래는 slub 디버그일 때 사용된다.
+ */
 	inc_slabs_node(kmem_cache_node, node, page->objects);
 
 	/*
 	 * No locks need to be taken here as it has just been
 	 * initialized and there is no concurrent access.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * 부트업 타임에는 lock 없이 slub 페이지를 노드의 partial 리스트에 추가한다.
+ */
 	__add_partial(n, page, DEACTIVATE_TO_HEAD);
 }
 
@@ -2974,13 +3551,28 @@ static int init_kmem_cache_nodes(struct kmem_cache *s)
 {
 	int node;
 
+/* IAMROOT-12 fehead (2016-12-26):
+ * --------------------------
+ * pi2
+ * for ( (node) = 0; (node) == 0; (node) = 1)
+ */
 	for_each_node_state(node, N_NORMAL_MEMORY) {
 		struct kmem_cache_node *n;
 
+/* IAMROOT-12:
+ * -------------
+ * slub 할당자가 아직 준비되지 않은 상태에서는 kmem_cache_node에 대해 
+ * 일단 페이지 할당자를 사용하여 준비한다.
+ */
 		if (slab_state == DOWN) {
 			early_kmem_cache_node_alloc(node);
 			continue;
 		}
+/* IAMROOT-12:
+ * -------------
+ * slub 할당자가 일부라도 동작하는 경우에는 아래 루틴을 통해 slub에서 
+ * kmem_cache_node를 할당받는다.
+ */
 		n = kmem_cache_alloc_node(kmem_cache_node,
 						GFP_KERNEL, node);
 
@@ -2997,6 +3589,14 @@ static int init_kmem_cache_nodes(struct kmem_cache *s)
 
 static void set_min_partial(struct kmem_cache *s, unsigned long min)
 {
+/* IAMROOT-12:
+ * -------------
+ * min 값을 min_partial에 대입하되 MIN_PARTIAL(5) ~ MAX_PARTIAL(10) 범위로 제한한다.
+ */
+	/* IAMROOT-12 fehead (2016-12-10):
+	 * --------------------------
+	 * MIN_PARTIAL=5, MAX_PARTIAL= 10
+	 */
 	if (min < MIN_PARTIAL)
 		min = MIN_PARTIAL;
 	else if (min > MAX_PARTIAL)
@@ -3008,9 +3608,28 @@ static void set_min_partial(struct kmem_cache *s, unsigned long min)
  * calculate_sizes() determines the order and the distribution of data within
  * a slab object.
  */
+/* IAMROOT-12 fehead (2016-12-10):
+ * --------------------------
+ * calculate_sizes()는 slab 객체 내에서 데이터의 order와 분포를 결정합니다.
+ *
+ * forced_order 가 -1이면 slub order값 자동 계산.
+ * s->flags를 참조하여 s->inuse(Object size + 디버그FP size), s->size(object +
+ * debug size) 설정, 적정(s->oo), 최소(s->min), 최대(s->max) slub order를 설정
+ */
 static int calculate_sizes(struct kmem_cache *s, int forced_order)
 {
+	/* IAMROOT-12 fehead (2016-12-10):
+	 * --------------------------
+	 * flags = 0x2000
+	 * size = 0x20
+	 */
 	unsigned long flags = s->flags;
+
+/* IAMROOT-12:
+ * -------------
+ * s->object_size: 요청 object size 
+ * s->size:        디버그 정보등이 추가된 object size
+ */
 	unsigned long size = s->object_size;
 	int order;
 
@@ -3019,6 +3638,13 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 	 * place the free pointer at word boundaries and this determines
 	 * the possible location of the free pointer.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * 사이즈는 포인터 주소 길이로 정렬한다.
+ * (기존 캐시가 64바이트인 경우 62바이트 캐시를 요청하면 64바이트 캐시를 
+ * 사용하게 한다) 
+ */
 	size = ALIGN(size, sizeof(void *));
 
 #ifdef CONFIG_SLUB_DEBUG
@@ -3039,6 +3665,13 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 	 * end of the object and the free pointer. If not then add an
 	 * additional word to have some bytes to store Redzone information.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * align된 object 사이즈와 원래 object 사이에 공간이 1 byte 이상 있는 경우 
+ * red zone 영역으로 사용할 수 있다. 그러나 처음부터 object 사이즈가 
+ * 정렬되어 있는 경우에는 추가로 포인터 주소 길이만큼 사이즈를 추가한다.
+ */
 	if ((flags & SLAB_RED_ZONE) && size == s->object_size)
 		size += sizeof(void *);
 #endif
@@ -3087,11 +3720,34 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 	 * offset 0. In order to align the objects we have to simply size
 	 * each object to conform to the alignment.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * 최종 계산된 size 역시 s->align 단위로 정렬되어야 한다.
+ */
+/* IAMROOT-12 fehead (2016-12-14):
+ * --------------------------
+ * size = ALIGN(0x20, 0x40) = 0x40
+ */
 	size = ALIGN(size, s->align);
 	s->size = size;
+
+/* IAMROOT-12:
+ * -------------
+ * 지정한 order가 없으면 적절히 시스템이 산출해낸다. 
+ * (낭비되는 영역을 최소화 시킬 수 있는 알고리즘을 사용한다)
+ */
+	/* IAMROOT-12 fehead (2016-12-14):
+	 * --------------------------
+	 * forced_order = -1
+	 */
 	if (forced_order >= 0)
 		order = forced_order;
 	else
+		/* IAMROOT-12 fehead (2016-12-14):
+		 * --------------------------
+		 * size = 0x40, s->reserved = 0
+		 */
 		order = calculate_order(size, s->reserved);
 
 	if (order < 0)
@@ -3101,33 +3757,83 @@ static int calculate_sizes(struct kmem_cache *s, int forced_order)
 	if (order)
 		s->allocflags |= __GFP_COMP;
 
+/* IAMROOT-12:
+ * -------------
+ * ZONE_DMA를 사용하게 하는 캐시 플래그
+ */
+	/* IAMROOT-12 fehead (2016-12-16):
+	 * --------------------------
+	 * 확인결과 scsi 장비에서 사용.
+	 */
 	if (s->flags & SLAB_CACHE_DMA)
 		s->allocflags |= GFP_DMA;
 
+	/* IAMROOT-12 fehead (2016-12-16):
+	 * --------------------------
+	 * file에 관련된 곳에서 사용.
+	 */
 	if (s->flags & SLAB_RECLAIM_ACCOUNT)
 		s->allocflags |= __GFP_RECLAIMABLE;
 
 	/*
 	 * Determine the number of objects per slab
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * s->oo 권장오더, object 수
+ * s->min 최소오더, object 수
+ *
+ * s->max 
+ */
 	s->oo = oo_make(order, size, s->reserved);
 	s->min = oo_make(get_order(size), size, s->reserved);
 	if (oo_objects(s->oo) > oo_objects(s->max))
 		s->max = s->oo;
 
+/* IAMROOT-12:
+ * -------------
+ * 권장 order가 결정된 경우 true를 반환한다.
+ */
 	return !!oo_objects(s->oo);
 }
 
+/* IAMROOT-12 fehead (2016-12-10):
+ * --------------------------
+ * __kmem_cache_create (s=&boot_kmem_cache_node, flags=0x2000)
+ *	kmem_cache_open (s=&boot_kmem_cache_node, flags=0x2000)
+ */
 static int kmem_cache_open(struct kmem_cache *s, unsigned long flags)
 {
+/* IAMROOT-12:
+ * -------------
+ * slub 디버거가 동작하는 경우 flag에 사용하는 디버그 플래그 옵션을 추가한다.
+ */
+	/* IAMROOT-12 fehead (2016-12-14):
+	 * --------------------------
+	 * s->flags = 0x2000, s->reservied = 0
+	 */
 	s->flags = kmem_cache_flags(s->size, flags, s->name, s->ctor);
 	s->reserved = 0;
 
+/* IAMROOT-12:
+ * -------------
+ * slub 페이지를 할당 해제할 때 사용해야 하는 일부 사이즈를 slub 페이지에 리저브한다.
+ */
 	if (need_reserve_slab_rcu && (s->flags & SLAB_DESTROY_BY_RCU))
 		s->reserved = sizeof(struct rcu_head);
 
+/* IAMROOT-12:
+ * -------------
+ * s->oo, s->min, s->max를 산출한다. (order와 objects 수)
+ */
 	if (!calculate_sizes(s, -1))
 		goto error;
+
+/* IAMROOT-12:
+ * -------------
+ * slub 디버그로 인해서 order가 상승되는 경우를 막기 위한 옵션이다.
+ */
 	if (disable_higher_order_debug) {
 		/*
 		 * Disable debugging flags that store metadata if the min slab
@@ -3143,6 +3849,10 @@ static int kmem_cache_open(struct kmem_cache *s, unsigned long flags)
 
 #if defined(CONFIG_HAVE_CMPXCHG_DOUBLE) && \
     defined(CONFIG_HAVE_ALIGNED_STRUCT_PAGE)
+	/* IAMROOT-12 fehead (2016-12-10):
+	 * --------------------------
+	 * pi2에서 실행 안됨
+	 */
 	if (system_has_cmpxchg_double() && (s->flags & SLAB_DEBUG_FLAGS) == 0)
 		/* Enable fast mode */
 		s->flags |= __CMPXCHG_DOUBLE;
@@ -3151,6 +3861,15 @@ static int kmem_cache_open(struct kmem_cache *s, unsigned long flags)
 	/*
 	 * The larger the object size is, the more pages we want on the partial
 	 * list to avoid pounding the page allocator excessively.
+	 */
+/* IAMROOT-12:
+ * -------------
+ * min 값을 min_partial에 대입하되 MIN_PARTIAL(5) ~ MAX_PARTIAL(10) 범위로 제한한다.
+ * size=1024 미만은 s->min_partial = 5로 제한된다.
+ */
+	/* IAMROOT-12 fehead (2016-12-10):
+	 * --------------------------
+	 * s->min_partial = 5
 	 */
 	set_min_partial(s, ilog2(s->size) / 2);
 
@@ -3171,6 +3890,28 @@ static int kmem_cache_open(struct kmem_cache *s, unsigned long flags)
 	 *    per node list when we run out of per cpu objects. We only fetch
 	 *    50% to keep some capacity around for frees.
 	 */
+	/* IAMROOT-12 fehead (2016-12-10):
+	 * --------------------------
+	 * cpu_partial은 프로세서의 CPU 별 partial 목록에 보관되는 객체의 최대
+	 * 개수를 결정합니다.
+	 *
+	 * Per cpu partial 목록에는 주로 하나의 객체가 해제 된 슬랩이 포함됩니다.
+	 * 할당에 사용되는 경우 최소의 노력으로 다시 채울 수 있습니다. 슬랩은 노
+	 * 드 별 partial 목록에 절대 도달하지 않으므로 잠금이 필요하지 않습니다.
+	 *
+	 * 이 설정은 또한
+	 * 
+	 * A) 한계에 도달하면 노드 목록 당 덤프 된 CPU 당 partial 슬랩의 오브젝
+	 * 트 수입니다.
+	 * B) CPU 당 partial 객체가 부족할 때 노드 목록에서 추출 할 cpu partial
+	 *  슬랩의 객체 수입니다. 우리는 자유를 위해 약간의 수용력을 유지하기
+	 *  위해 50% 만 가져옵니다.
+	 */
+
+/* IAMROOT-12:
+ * -------------
+ * size가 작을 수록 cpu_partial 수는 크게 준비한다.
+ */
 	if (!kmem_cache_has_cpu_partial(s))
 		s->cpu_partial = 0;
 	else if (s->size >= PAGE_SIZE)
@@ -3182,15 +3923,37 @@ static int kmem_cache_open(struct kmem_cache *s, unsigned long flags)
 	else
 		s->cpu_partial = 30;
 
+/* IAMROOT-12:
+ * -------------
+ * 1000=(100%) 확률로 리모트 노드의 partial에서 slub 페이지를 cpu partial로 
+ * 공급받을 수 있게 한다. 
+ *
+ * 0=(0%) 자기 노드의 partial에서만 slub 페이지를 cpu partial로 공급할 수 
+ * 있도록 제한된다.
+ */
 #ifdef CONFIG_NUMA
 	s->remote_node_defrag_ratio = 1000;
 #endif
+
+/* IAMROOT-12:
+ * -------------
+ * kmem_cache_node 캐시에 있는 nodes[]를 초기화한다.
+ */
 	if (!init_kmem_cache_nodes(s))
 		goto error;
 
+/* IAMROOT-12:
+ * -------------
+ * kmem_cache_cpu 구조체는 per-cpu 동적 할당을 받아 초기화한 후 
+ * 성공 시 0을 반환한다.
+ */
 	if (alloc_kmem_cache_cpus(s))
 		return 0;
 
+/* IAMROOT-12:
+ * -------------
+ * per-cpu 할당에 문제가 생기면 노드들도 다시 지운다.
+ */
 	free_kmem_cache_nodes(s);
 error:
 	if (flags & SLAB_PANIC)
@@ -3276,6 +4039,10 @@ int __kmem_cache_shutdown(struct kmem_cache *s)
  *		Kmalloc subsystem
  *******************************************************************/
 
+/* IAMROOT-12:
+ * -------------
+ * "slub_min_order=", "slub_max_order=" 커널 파라메터로 slub order 페이지를 지정한다.
+ */
 static int __init setup_slub_min_order(char *str)
 {
 	get_option(&str, &slub_min_order);
@@ -3641,9 +4408,19 @@ static struct notifier_block slab_memory_callback_nb = {
 static struct kmem_cache * __init bootstrap(struct kmem_cache *static_cache)
 {
 	int node;
+
+/* IAMROOT-12:
+ * -------------
+ * kmem_cache 캐시로부터 0으로 초기화된 object를 하나 받아온다.
+ */
 	struct kmem_cache *s = kmem_cache_zalloc(kmem_cache, GFP_NOWAIT);
 	struct kmem_cache_node *n;
 
+/* IAMROOT-12:
+ * -------------
+ * 빌드 타임에 사용된 static kmem_cache를 할당 받은 kmem_cache 오브젝트에 
+ * 복사한다.
+ */
 	memcpy(s, static_cache, kmem_cache->object_size);
 
 	/*
@@ -3651,10 +4428,20 @@ static struct kmem_cache * __init bootstrap(struct kmem_cache *static_cache)
 	 * up.  Even if it weren't true, IRQs are not up so we couldn't fire
 	 * IPIs around.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * cpu이 partial 리스트를 flush하여 노드 partial 리스트로 옮긴다.
+ */
 	__flush_cpu_slab(s, smp_processor_id());
 	for_each_kmem_cache_node(s, node, n) {
 		struct page *p;
 
+/* IAMROOT-12:
+ * -------------
+ * 노드의 partial 리스트에 있는 모든 slub 페이지가 기존 static으로 설정된 
+ * 캐시가 아닌 새로운 캐시를 가리키게 한다.
+ */
 		list_for_each_entry(p, &n->partial, lru)
 			p->slab_cache = s;
 
@@ -3664,6 +4451,11 @@ static struct kmem_cache * __init bootstrap(struct kmem_cache *static_cache)
 #endif
 	}
 	slab_init_memcg_params(s);
+
+/* IAMROOT-12:
+ * -------------
+ * 전역 slab_caches 리스트에 현재 만들어진 캐시를 추가한다.
+ */
 	list_add(&s->list, &slab_caches);
 	return s;
 }
@@ -3676,22 +4468,51 @@ void __init kmem_cache_init(void)
 	if (debug_guardpage_minorder())
 		slub_max_order = 0;
 
+/* IAMROOT-12:
+ * -------------
+ * 캐시에 사용하는 구조체 3개 중 kmem_cache 구조체는 빌드타임에
+ * 만들어진 것을 일단 이용한다.
+ *    - kmem_cache      (slub object로 할당)
+ *    - kmem_cache_node (slub object로 할당) 
+ *    - kmem_cache_cpu  (per-cpu로 할당)
+ *
+ * 처음 캐시 초기화 시 두 개의 캐시는 다른 캐시를 만들 때 항상
+ * 이용하므로 두 개의 캐시용으로 kemem_cache를 준비한다.
+ */
 	kmem_cache_node = &boot_kmem_cache_node;
 	kmem_cache = &boot_kmem_cache;
 
+/* IAMROOT-12:
+ * -------------
+ * 1. kmem_cache_node 캐시 준비
+ */
 	create_boot_cache(kmem_cache_node, "kmem_cache_node",
 		sizeof(struct kmem_cache_node), SLAB_HWCACHE_ALIGN);
 
 	register_hotmemory_notifier(&slab_memory_callback_nb);
 
 	/* Able to allocate the per node structures */
+
+/* IAMROOT-12:
+ * -------------
+ * kmem_cache_node 캐시가 준비된 상태
+ */
 	slab_state = PARTIAL;
 
+/* IAMROOT-12:
+ * -------------
+ * 2. kmem_cache 캐시 준비
+ */
 	create_boot_cache(kmem_cache, "kmem_cache",
 			offsetof(struct kmem_cache, node) +
 				nr_node_ids * sizeof(struct kmem_cache_node *),
 		       SLAB_HWCACHE_ALIGN);
 
+/* IAMROOT-12:
+ * -------------
+ * 3. static 메모리에 구성한 kmem_cache를 새로 만든 slub 캐시로부터 할당받아 
+ *    복사한다. 그런 후 전역 slab_caches 리스트에 추가한다.
+ */
 	kmem_cache = bootstrap(&boot_kmem_cache);
 
 	/*
@@ -3699,9 +4520,21 @@ void __init kmem_cache_init(void)
 	 * kmem_cache_node is separately allocated so no need to
 	 * update any list pointers.
 	 */
+/* IAMROOT-12:
+ * -------------
+ * 4. static 메모리에 구성한 kmem_cache를 새로 만든 slub 캐시로부터 할당받아 
+ *    복사한다. 그런 후 전역 slab_caches 리스트에 추가한다.
+ */
 	kmem_cache_node = bootstrap(&boot_kmem_cache_node);
 
 	/* Now we can use the kmem_cache to allocate kmalloc slabs */
+
+/* IAMROOT-12:
+ * -------------
+ * kmalloc 캐시를 준비한다. 
+ * slub의 경우 캐시라인 바이트~8192까지 2의 차수 단위로 증가하되, 하드웨어 캐시라인 크기에 
+ * 따라 96, 192도 준비한다)
+ */
 	create_kmalloc_caches(0);
 
 #ifdef CONFIG_SMP
@@ -3750,10 +4583,19 @@ __kmem_cache_alias(const char *name, size_t size, size_t align,
 	return s;
 }
 
+/* IAMROOT-12 fehead (2016-12-03):
+ * --------------------------
+ * *s ={ size = 0x20, object_size = 0x20, align = 0x40, name = "kmem_cache_node"
+ * flags = SLAB_HWCACHE_ALIGN(0x2000)
+ */
 int __kmem_cache_create(struct kmem_cache *s, unsigned long flags)
 {
 	int err;
 
+/* IAMROOT-12:
+ * -------------
+ * 
+ */
 	err = kmem_cache_open(s, flags);
 	if (err)
 		return err;

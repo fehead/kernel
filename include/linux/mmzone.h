@@ -23,8 +23,16 @@
 #ifndef CONFIG_FORCE_MAX_ZONEORDER
 #define MAX_ORDER 11
 #else
+/* IAMROOT-12 fehead (2016-12-15):
+ * --------------------------
+ * pi2 = 11
+ */
 #define MAX_ORDER CONFIG_FORCE_MAX_ZONEORDER
 #endif
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * MAX_ORDER_NR_PAGES = 1024
+ */
 #define MAX_ORDER_NR_PAGES (1 << (MAX_ORDER - 1))
 
 /*
@@ -388,7 +396,7 @@ enum zone_type {
 	ZONE_MOVABLE,
 /* IAMROOT-12 fehead (2016-10-16):
  * --------------------------
- * 라즈베리파이는 2
+ * 라즈베리파이는 2, ZONE_NORMAL, ZONE_MOVABLE
  */
 	__MAX_NR_ZONES
 };
@@ -710,6 +718,10 @@ static inline bool zone_is_empty(struct zone *zone)
 #define DEF_PRIORITY 12
 
 /* Maximum number of zones on a zonelist */
+/* IAMROOT-12 fehead (2016-12-29):
+ * --------------------------
+ * pi2: 2
+ */
 #define MAX_ZONES_PER_ZONELIST (MAX_NUMNODES * MAX_NR_ZONES)
 
 #ifdef CONFIG_NUMA

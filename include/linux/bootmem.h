@@ -114,6 +114,10 @@ extern void *__alloc_bootmem_low_node(pg_data_t *pgdat,
  */
 #ifdef CONFIG_NO_BOOTMEM
 /* We are using top down, so it is safe to use 0 here */
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * pi2
+ */
 #define BOOTMEM_LOW_LIMIT 0
 #else
 #define BOOTMEM_LOW_LIMIT __pa(MAX_DMA_ADDRESS)
@@ -148,6 +152,10 @@ extern void *__alloc_bootmem_low_node(pg_data_t *pgdat,
 	__alloc_bootmem_low_node(pgdat, x, PAGE_SIZE, 0)
 
 
+/* IAMROOT-12 fehead (2016-11-28):
+ * --------------------------
+ * pi2
+ */
 #if defined(CONFIG_HAVE_MEMBLOCK) && defined(CONFIG_NO_BOOTMEM)
 
 /* FIXME: use MEMBLOCK_ALLOC_* variants here */
@@ -215,6 +223,10 @@ static inline void * __init memblock_virt_alloc_low_nopanic(
 						   NUMA_NO_NODE);
 }
 
+/* IAMROOT-12 fehead (2016-11-28):
+ * --------------------------
+ * pi2
+ */
 static inline void * __init memblock_virt_alloc_from_nopanic(
 		phys_addr_t size, phys_addr_t align, phys_addr_t min_addr)
 {
@@ -236,6 +248,10 @@ static inline void * __init memblock_virt_alloc_node(
 					    BOOTMEM_ALLOC_ACCESSIBLE, nid);
 }
 
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * size = 0x3c000 * 0x24(36) = 0x870000(8847360, 8.44M), nid = 0
+ */
 static inline void * __init memblock_virt_alloc_node_nopanic(
 						phys_addr_t size, int nid)
 {
@@ -363,6 +379,10 @@ static inline void __init memblock_free_late(
 #ifdef CONFIG_HAVE_ARCH_ALLOC_REMAP
 extern void *alloc_remap(int nid, unsigned long size);
 #else
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * pi2
+ */
 static inline void *alloc_remap(int nid, unsigned long size)
 {
 	return NULL;

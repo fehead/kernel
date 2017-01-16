@@ -488,6 +488,10 @@ static inline int num_node_state(enum node_states state)
 	return 1;
 }
 
+/* IAMROOT-12 fehead (2016-12-26):
+ * --------------------------
+ * pi2 용.
+ */
 #define for_each_node_state(node, __state) \
 	for ( (node) = 0; (node) == 0; (node) = 1)
 

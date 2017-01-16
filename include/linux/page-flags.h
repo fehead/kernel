@@ -232,6 +232,11 @@ PAGEFLAG(Referenced, referenced) TESTCLEARFLAG(Referenced, referenced)
 	__SETPAGEFLAG(Referenced, referenced)
 PAGEFLAG(Dirty, dirty) TESTSCFLAG(Dirty, dirty) __CLEARPAGEFLAG(Dirty, dirty)
 PAGEFLAG(LRU, lru) __CLEARPAGEFLAG(LRU, lru)
+/* IAMROOT-12 fehead (2017-01-14):
+ * --------------------------
+ * PAGE Slab Flag enable 시 active는 비상용 slub으로 사용한다 라는 뜻.
+ *	보통 network swap을 쓸때 쓴다.
+ */
 PAGEFLAG(Active, active) __CLEARPAGEFLAG(Active, active)
 	TESTCLEARFLAG(Active, active)
 __PAGEFLAG(Slab, slab)

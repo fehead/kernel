@@ -930,6 +930,19 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 	 * invisible to the vm, so the page can not be migrated.  So try to
 	 * free the metadata, so the page can be freed.
 	 */
+	/* IAMROOT-12 fehead (2016-11-26):
+	 * --------------------------
+	 * 코너 케이스 처리 :
+	 * 1. 새로운 스왑 캐시 페이지가 읽히면 LRU에 추가되고 swapcache로 취급
+	 * 되지만 아직 rmap이 없습니다.
+	 * page->mapping == NULL 페이지에 대해 try_to_unmap()을 호출하면 BUG가
+	 * 트리거 됩니다. 여기에서 처리하십시오.
+	 * 2. 고아 페이지 (truncate_complete_page 참조)에 fs-private 메타 데이터
+	 * 가있을 수 있습니다. 메모리 오프 라이닝으로 인해 페이지를 가져올 수 있
+	 * 습니다. 페이지 재 확보를 제외하고는 페이지가 VM에서 보이지 않으므로
+	 * 페이지를 마이그레이션 할 수 없습니다. 따라서 메타 데이터를 해제하여
+	 * 페이지를 비울 수 있습니다.
+	 */
 
 /* IAMROOT-12:
  * -------------
@@ -976,6 +989,10 @@ out:
 /*
  * Obtain the lock on page, remove all ptes and migrate the page
  * to the newly allocated page in newpage.
+ */
+/* IAMROOT-12 fehead (2016-11-26):
+ * --------------------------
+ * put_new_page = compaction_free
  */
 static int unmap_and_move(new_page_t get_new_page, free_page_t put_new_page,
 			unsigned long private, struct page *page, int force,
@@ -1172,6 +1189,12 @@ out:
  * or free list only if ret != 0.
  *
  * Returns the number of pages that were not migrated, or an error code.
+ */
+/* IAMROOT-12 fehead (2016-11-26):
+ * --------------------------
+ * err = migrate_pages(&cc->migratepages, compaction_alloc,
+ *	compaction_free, (unsigned long)cc, cc->mode,
+ *	MR_COMPACTION);
  */
 int migrate_pages(struct list_head *from, new_page_t get_new_page,
 		free_page_t put_new_page, unsigned long private,

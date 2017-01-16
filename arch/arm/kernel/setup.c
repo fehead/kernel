@@ -813,7 +813,7 @@ void notrace cpu_init(void)
  */
 /* IAMROOT-12 fehead (2016-11-24):
  * --------------------------
- * rpi2: __cpu_logical_map[] = { 0xf00, 0xf01, 0xf02, 0xf03 }
+ * rpi2: __cpu_logical_map[] = { 0x0, 0x1, 0x2, 0x3 }
  */
 u32 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = MPIDR_INVALID };
 
@@ -1053,24 +1053,60 @@ static void __init setup_processor(void)
  * 위의 구조체중 v7_으로 시작되는 구조체들은 ../mm/proc-macros.S에서 정의된다.
  * v6_user_fns만 직접 사용한다.
  */
-
+	/* IAMROOT-12D (2016-05-21):
+	 * --------------------------
+	 * - proc: process 초기화 관련 함수 목록(arch/arm/mm/proc-macros.S 참고)
+	 *	v7_early_abort, v7_pabort, cpu_v7_proc_init, cpu_v7_proc_fin
+	 *	, cpu_v7_reset, cpu_v7_do_idle, cpu_v7_dcache_clean_area
+	 *	, cpu_v7_switch_mm, cpu_v7_set_pte_ext, cpu_v7_suspend_size등의 함수
+	 * - tlb: tlb table flush 관련 함수 목록 arch/arm/mm/tlb-v7.S 참고
+	 *     	v7wbi_flush_kern_tlb_range, v7wbi_tlb_flags_smp, v7wbi_tlb_flags_up
+	 * - user: 사용자 메모리 할당과 해제(?)
+	 * - cache: cache 정책 함수들.
+	 * - hwcap:
+	 */
 #ifdef MULTI_CPU
+	/* IAMROOT-12D (2016-05-24):
+	 * --------------------------
+	 * 	struct processor	*proc = v7_processor_functions;
+	 */
 	processor = *list->proc;
 #endif
 #ifdef MULTI_TLB
+	/* IAMROOT-12D (2016-05-24):
+	 * --------------------------
+	 * 	struct cpu_tlb_fns	*tlb = v7wbi_tlb_fns;
+	 */
 	cpu_tlb = *list->tlb;
 #endif
 #ifdef MULTI_USER
+	/* IAMROOT-12D (2016-05-24):
+	 * --------------------------
+	 * 	struct cpu_user_fns	*user = v6_user_fns;
+	 */
 	cpu_user = *list->user;
 #endif
 #ifdef MULTI_CACHE
+	/* IAMROOT-12D (2016-05-24):
+	 * --------------------------
+	 * 	struct cpu_cache_fns	*cache = v7_cache_fns;
+	 */
 	cpu_cache = *list->cache;
 #endif
 
+	/* IAMROOT-12D (2016-05-21):
+	 * --------------------------
+	 * CPU: ARMv7 Processor [410fc075] revision 5 (ARMv7), cr=10c5387d
+	 */
 	pr_info("CPU: %s [%08x] revision %d (ARMv%s), cr=%08lx\n",
 		cpu_name, read_cpuid_id(), read_cpuid_id() & 15,
 		proc_arch[cpu_architecture()], get_cr());
 
+	/* IAMROOT-12D (2016-05-25):
+	 * --------------------------
+	 * machine = "armv7l"
+	 * elf_platform = "v7l"
+	 */
 	snprintf(init_utsname()->machine, __NEW_UTS_LEN + 1, "%s%c",
 		 list->arch_name, ENDIANNESS);
 	snprintf(elf_platform, ELF_PLATFORM_SIZE, "%s%c",

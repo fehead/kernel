@@ -149,6 +149,14 @@ size_t ksize(const void *);
  * alignment larger than the alignment of a 64-bit integer.
  * Setting ARCH_KMALLOC_MINALIGN in arch headers allows that.
  */
+
+/* IAMROOT-12:
+ * -------------
+ * rpi2: 
+ *  - ARCH_DMA_MINALIGN:    64 
+ *  - KMALLOC_MIN_SIZE:     64
+ *  - KMALLOC_SHIFT_LOW:    6
+ */
 #if defined(ARCH_DMA_MINALIGN) && ARCH_DMA_MINALIGN > 8
 #define ARCH_KMALLOC_MINALIGN ARCH_DMA_MINALIGN
 #define KMALLOC_MIN_SIZE ARCH_DMA_MINALIGN
@@ -183,6 +191,12 @@ size_t ksize(const void *);
 /*
  * SLUB directly allocates requests fitting in to an order-1 page
  * (PAGE_SIZE*2).  Larger requests are passed to the page allocator.
+ */
+
+/* IAMROOT-12:
+ * -------------
+ * slub을 사용하는 경우 8K 까지
+ * (rpi2: 이미 KMALLOC_SHIFT_LOW가 이미 6으로 등록됨)
  */
 #define KMALLOC_SHIFT_HIGH	(PAGE_SHIFT + 1)
 #define KMALLOC_SHIFT_MAX	(MAX_ORDER + PAGE_SHIFT)
@@ -570,6 +584,11 @@ extern void *__kmalloc_node_track_caller(size_t, gfp_t, int, unsigned long);
  */
 static inline void *kmem_cache_zalloc(struct kmem_cache *k, gfp_t flags)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * slub 캐시로부터 object를 하나 받아온 후 0으로 초기화한다.
+ */
 	return kmem_cache_alloc(k, flags | __GFP_ZERO);
 }
 

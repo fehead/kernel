@@ -24,6 +24,19 @@
  * the anon_vma object itself: we're guaranteed no page can be
  * pointing to this anon_vma once its vma list is empty.
  */
+/* IAMROOT-12 fehead (2016-11-26):
+ * --------------------------
+ * anon_vma는 private "related"vmas의 목록을 검색하여 anon_vma를 가리키는 익명
+ * 페이지가 매핑 해제되어야하는지 검사합니다. 목록의 vmas는 forking 또는 split으
+ * 로 연관됩니다.
+ *
+ * vma는 분할되고 병합됨에 따라 (특히 mprotect에서) 익명 페이지의 매핑 필드는
+ * vma를 직접 가리킬 수 없습니다. 대신 anon_vma를 가리키며 관련 vmas가 쉽게 연결
+ * 되거나 연결 해제 될 수있는 anon_vma를 가리 킵니다 .
+ *
+ * 목록의 마지막 vma를 연결 해제 한 후에는 anon_vma 객체 자체를 가비지 수집해야
+ * 합니다. vma 목록이 비워지면이 anon_vma를 가리키는 페이지가 없음을 보장합니다.
+ */
 struct anon_vma {
 	struct anon_vma *root;		/* Root of this anon_vma tree */
 	struct rw_semaphore rwsem;	/* W: modification, R: walking the list */

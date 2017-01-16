@@ -3,8 +3,10 @@
 ## 커뮤니티: IAMROOT 12차
 - [www.iamroot.org][#iamroot] | IAMROOT 홈페이지
 - [jake.dothome.co.kr][#moonc] | 문c 블로그
+- [라즈베리파이2 에뮬레이션(QEMM 및 디버깅) Wiki][#im]
 [#iamroot]: http://www.iamroot.org
 [#moonc]: http://jake.dothome.co.kr
+[#im]: https://github.com/iamroot12cd/linux/wiki
 
 ## History
 
@@ -397,3 +399,8 @@ page_address_init()
 ### 90주차
 - 2017.01.07, Kosslab (12명, 권경환, 김영준, 김종철, 문영일, 양유석, 유계성, 윤창호, 임채훈, 정재준, 조현철, 최영민, 한상종)
 - kmem_cache_alloc() ~  
+
+### 91주차
+- 2017.01.14, Kosslab (19명, 권경환, 김종철, 문영일, 양유석, 윤창호, 임채훈, 정재준, 조현철, 최영민)
+- kmem_cache_alloc()
+- kmem_cache_free()

@@ -701,6 +701,12 @@ redo:
 		 * We know how to handle that.
 		 */
 		is_unevictable = false;
+
+/* IAMROOT-12:
+ * -------------
+ * evitable 페이지들을 lru 캐시를 통해 추가한다.
+ * (내부에서 참조카운터 증가)
+ */
 		lru_cache_add(page);
 	} else {
 		/*
@@ -708,6 +714,11 @@ redo:
 		 * list.
 		 */
 		is_unevictable = true;
+
+/* IAMROOT-12:
+ * -------------
+ * unevictable 페이지들은 lru 캐시를 사용하지 않고 곧장 lruvec에 추가한다.
+ */
 		add_page_to_unevictable_list(page);
 		/*
 		 * When racing with an mlock or AS_UNEVICTABLE clearing
@@ -727,6 +738,12 @@ redo:
 	 * page is on unevictable list, it never be freed. To avoid that,
 	 * check after we added it to the list, again.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * 중간에 상태가 바뀌어 영원히 페이지가 회수되지 않게 하는 case가 발생하는 
+ * 경우 다시 lruvec을 다시 선택하여 집어넣는다.
+ */
 	if (is_unevictable && page_evictable(page)) {
 		if (!isolate_lru_page(page)) {
 			put_page(page);
@@ -743,6 +760,12 @@ redo:
 	else if (!was_unevictable && is_unevictable)
 		count_vm_event(UNEVICTABLE_PGCULLED);
 
+/* IAMROOT-12:
+ * -------------
+ * 참조카운터를 감소시켜 0이되는 페이지는 버디시스템으로 돌려보낸다.
+ * (lru로 돌아가는 페이지의 경우 내부에서 참조카운터를 1 증가 시키므로 
+ * 아래 함수에서는 참조카운터만 1감소시키고 실제 버디시스템으로 돌려보내지 않는다.)
+ */
 	put_page(page);		/* drop ref from isolate */
 }
 
@@ -1231,10 +1254,21 @@ int __isolate_lru_page(struct page *page, isolate_mode_t mode)
 	int ret = -EINVAL;
 
 	/* Only take pages on the LRU. */
+
+/* IAMROOT-12:
+ * -------------
+ * 여기서도 LRU 페이지가 아닌 경우 빠져나간다.
+ */
 	if (!PageLRU(page))
 		return ret;
 
 	/* Compaction should not handle unevictable pages but CMA can do so */
+
+/* IAMROOT-12:
+ * -------------
+ * ISOLATE_UNEVICTABLE 모드가 아니면 unevictable 페이지는 isolation 하지 않고 
+ * 빠져나간다.
+ */
 	if (PageUnevictable(page) && !(mode & ISOLATE_UNEVICTABLE))
 		return ret;
 
@@ -1251,6 +1285,13 @@ int __isolate_lru_page(struct page *page, isolate_mode_t mode)
 	 * ISOLATE_ASYNC_MIGRATE is used to indicate that it only wants to pages
 	 * that it is possible to migrate without blocking
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * ISOLATE_CLEAN의 경우 writeback이나 dirty 설정된 페이지들은 isolation skip 한다.
+ * ISOLATE_ASYNC_MIGRATE의 경우 writeback이나 dirty 설정된 페이지들 중
+ * 매핑되었지만 a_op->migratepage가 연결된 핸들러가 없는 경우 isolation skip 한다.
+ */
 	if (mode & (ISOLATE_CLEAN|ISOLATE_ASYNC_MIGRATE)) {
 		/* All the caller can do on PageWriteback is block */
 		if (PageWriteback(page))
@@ -1274,9 +1315,19 @@ int __isolate_lru_page(struct page *page, isolate_mode_t mode)
 		}
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * ISOLATE_UNMAPPED 모드로 요청하였으면서 매핑되어 있는 페이지들은 isolation하지 
+ * 않고 skip 한다.
+ */
 	if ((mode & ISOLATE_UNMAPPED) && page_mapped(page))
 		return ret;
 
+/* IAMROOT-12:
+ * -------------
+ * 높은 확률로 참조 카운터가 1 이상인 경우 1 증가 시키고, LRU 플래그를 클리어하고
+ * success로 0을 반환한다.
+ */
 	if (likely(get_page_unless_zero(page))) {
 		/*
 		 * Be careful not to clear PageLRU until after we're
@@ -2898,10 +2949,19 @@ static void age_active_anon(struct zone *zone, struct scan_control *sc)
 static bool zone_balanced(struct zone *zone, int order,
 			  unsigned long balance_gap, int classzone_idx)
 {
+/* IAMROOT-12:
+ * -------------
+ * free 페이지를 사용해서 워터마크 기준을 넘어서는지 체크를 하게 되는데 
+ * zone 카운터를 더 엄밀하게 읽어와서 워터마크 기준과 비교하도록 한다.
+ */
 	if (!zone_watermark_ok_safe(zone, order, high_wmark_pages(zone) +
 				    balance_gap, classzone_idx, 0))
 		return false;
 
+/* IAMROOT-12:
+ * -------------
+ * compatction을 skip하는 경우 false
+ */
 	if (IS_ENABLED(CONFIG_COMPACTION) && order && compaction_suitable(zone,
 				order, 0, classzone_idx) == COMPACT_SKIPPED)
 		return false;
@@ -3461,12 +3521,27 @@ void wakeup_kswapd(struct zone *zone, int order, enum zone_type classzone_idx)
 		pgdat->kswapd_max_order = order;
 		pgdat->classzone_idx = min(pgdat->classzone_idx, classzone_idx);
 	}
+
+/* IAMROOT-12:
+ * -------------
+ * kswapd_wait에서 대기하는 태스크가 없으면 함수를 빠져나간다.
+ */
 	if (!waitqueue_active(&pgdat->kswapd_wait))
 		return;
+
+/* IAMROOT-12:
+ * -------------
+ * 워터마크 기준을 충족하고 compaction 가능한 상태인 경우 함수를 빠져나간다.
+ */
 	if (zone_balanced(zone, order, 0, 0))
 		return;
 
 	trace_mm_vmscan_wakeup_kswapd(pgdat->node_id, zone_idx(zone), order);
+
+/* IAMROOT-12:
+ * -------------
+ * kswapd를 깨운다.
+ */
 	wake_up_interruptible(&pgdat->kswapd_wait);
 }
 

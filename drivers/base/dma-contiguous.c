@@ -155,6 +155,10 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
  * early 커널 파라메터 "cma="를 사용하는 경우는 바뀐다.
  *	참고: early_cma() 
  */
+	/* IAMROOT-12CD (2016-08-20):
+	 * --------------------------
+	 * size_cmdline 초기값은 -1
+	 */
 	if (size_cmdline != -1) {
 		selected_size = size_cmdline;
 		selected_base = base_cmdline;
@@ -163,6 +167,10 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
 			fixed = true;
 	} else {
 #ifdef CONFIG_CMA_SIZE_SEL_MBYTES
+		/* IAMROOT-12CD (2016-08-17):
+		 * --------------------------
+		 * selected_size = 5M(0x500000)
+		 */
 		selected_size = size_bytes;
 #elif defined(CONFIG_CMA_SIZE_SEL_PERCENTAGE)
 
@@ -178,6 +186,11 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
 #endif
 	}
 
+	/* IAMROOT-12CD (2016-08-17):
+	 * --------------------------
+	 * selected_size = 5M(0x500000)
+	 * dma_contiguous_default_area = 0
+	 */
 	if (selected_size && !dma_contiguous_default_area) {
 		pr_debug("%s: reserving %ld MiB for global area\n", __func__,
 			 (unsigned long)selected_size / SZ_1M);
@@ -186,7 +199,13 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
 /* IAMROOT-12AB:
  * -------------
  * cma 영역을 할당하고 cma_areas[] 및 dma_mmu_remap[]에 엔트리를 추가한다.
+ * rpi2: selected_size=5M 
  */
+		/* IAMROOT-12CD (2016-08-20):
+		 * --------------------------
+		 * selected_size= 5M(0x500000), selected_base= 0,
+		 * selected_limit= 0xffffffff, fixed= false
+		 */
 		dma_contiguous_reserve_area(selected_size, selected_base,
 					    selected_limit,
 					    &dma_contiguous_default_area,

@@ -147,19 +147,19 @@ static void __init find_limits(unsigned long *min, unsigned long *max_low,
 
 /* IAMROOT-12AB:
  * -------------
- * max_low: lowmem/highmem 경계
+ * max_low: lowmem/highmem 경계, *max_low = 0x3c000
  */
 	*max_low = PFN_DOWN(memblock_get_current_limit());
 
 /* IAMROOT-12AB:
  * -------------
- * min: DRAM의 시작 주소 (memblock.memory.regions[0].base)
+ * min: DRAM의 시작 주소 (memblock.memory.regions[0].base), *min = 0x0
  */
 	*min = PFN_UP(memblock_start_of_DRAM());
 
 /* IAMROOT-12AB:
  * -------------
- * max_high: DRM의 끝 주소 (memblock.memory.region[마지막].base + size)
+ * max_high: DRM의 끝 주소 (memblock.memory.region[마지막].base + size), *max_high = 0x3c000
  */
 	*max_high = PFN_DOWN(memblock_end_of_DRAM());
 }
@@ -222,6 +222,10 @@ void __init setup_dma_zone(const struct machine_desc *mdesc)
 #endif
 }
 
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * min=0x0,  max_low = 0x3c000, max_high = 0x3c000
+ */
 static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
 	unsigned long max_high)
 {
@@ -243,6 +247,10 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
  * -------------
  * 먼저 ZONE_NORMAL 영역에 대한 페이지 수를 계산한다.(hole을 포함)
  */
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * 0x3c000
+	 */
 	zone_size[0] = max_low - min;
 #ifdef CONFIG_HIGHMEM
 
@@ -262,8 +270,16 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
  * -------------
  * 각 ZONE의 hole의 페이지 수를 계산한다.
  */
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * zhole_size = {0x3c000, 0x0}
+	 */
 	memcpy(zhole_size, zone_size, sizeof(zhole_size));
 	for_each_memblock(memory, reg) {
+		/* IAMROOT-12 fehead (2017-01-02):
+		 * --------------------------
+		 * start = 0x0, end = 0x0x3c000
+		 */
 		unsigned long start = memblock_region_memory_base_pfn(reg);
 		unsigned long end = memblock_region_memory_end_pfn(reg);
 
@@ -278,6 +294,10 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
 		}
 #endif
 	}
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * zhole_size = {0x0, 0x0}
+	 */
 
 #ifdef CONFIG_ZONE_DMA
 	/*
@@ -302,6 +322,12 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
  *	zhole_size[]:	zone별로 hole page 갯수
  *	min:		시작 메모리 pfn (노드별)
  */
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * zone_size = {0x3c000, 0x0}
+	 * zhole_size = {0x0, 0x0}
+	 * min = 0
+	 */
 	free_area_init_node(0, zone_size, min, zhole_size);
 }
 
@@ -334,6 +360,10 @@ static void __init arm_memory_present(void)
 }
 #endif
 
+/* IAMROOT-12CD (2016-08-27):
+ * --------------------------
+ * arm_memblock_steal_permitted = false (arm_memblock_init() 함수에서 설정)
+ */
 static bool arm_memblock_steal_permitted = true;
 
 phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
@@ -361,10 +391,23 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
 #ifdef CONFIG_XIP_KERNEL
 	memblock_reserve(__pa(_sdata), _end - _sdata);
 #else
+	/* IAMROOT-12CD (2016-08-16):
+	 * --------------------------
+	 * memblock_reserve(0x8240, 9737564)
+	 */
 	memblock_reserve(__pa(_stext), _end - _stext);
 #endif
 #ifdef CONFIG_BLK_DEV_INITRD
+	/* IAMROOT-12CD (2016-08-16):
+	 * --------------------------
+	 * initrd_start = 0
+	 * phys_initrd_size = 0
+	 */
 	/* FDT scan will populate initrd_start */
+	/* IAMROOT-12CD (2016-08-20):
+	 * --------------------------
+	 * initrd_start: 0, phys_initrd_size:0
+	 */
 	if (initrd_start && !phys_initrd_size) {
 		phys_initrd_start = __virt_to_phys(initrd_start);
 		phys_initrd_size = initrd_end - initrd_start;
@@ -412,6 +455,11 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
  */
 	/* reserve any platform specific memblock areas */
 	if (mdesc->reserve)
+		/* IAMROOT-12CD (2016-08-20):
+		 * --------------------------
+		 * arch/arm/mach-bcm2709/bcm2709.c
+		 *  board_reserve() 호출
+		 */
 		mdesc->reserve();
 
 /* IAMROOT-12AB:
@@ -436,6 +484,10 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
 
 void __init bootmem_init(void)
 {
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * min, max_low, max_high는 해당 주소의 페이지 index. - (vaddr >> 12)
+	 */
 	unsigned long min, max_low, max_high;
 
 /* IAMROOT-12AB:
@@ -448,6 +500,7 @@ void __init bootmem_init(void)
 /* IAMROOT-12AB:
  * -------------
  * DRAM 시작 물리주소, lowmem/highmem 경계 물리주소, DRAM 끝 물리주소
+ * max_low = 0x3c000, min = 0x0 , max_high = 0x3c000
  */
 	find_limits(&min, &max_low, &max_high);
 

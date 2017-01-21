@@ -906,6 +906,15 @@ void __init early_trap_init(void *vectors_base)
  * -------------
  * 할당 받은 2개의 페이지에 벡터(8개 엔트리 x 4 = 32 bytes)와 스터브 코드를 복사한다.
  */
+
+/* IAMROOT-12 fehead (2016-11-18):
+ * --------------------------
+ * (gdb) p/x __vectors_start = 0x8079d000
+ * (gdb) p/x __vectors_end - __vectors_start = 0x20
+ *
+ * (gdb) p/x __stubs_start = 0x8079d020
+ * (gdb) p/x __stubs_end - __stubs_start = 0x2c0
+ */
 	memcpy((void *)vectors, __vectors_start, __vectors_end - __vectors_start);
 	memcpy((void *)vectors + 0x1000, __stubs_start, __stubs_end - __stubs_start);
 

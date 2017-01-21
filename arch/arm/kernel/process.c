@@ -126,6 +126,10 @@ void soft_restart(unsigned long addr)
 void (*pm_power_off)(void);
 EXPORT_SYMBOL(pm_power_off);
 
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * rpi2: arm_pm_restart = bcm2709_restart
+ */
 void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
 
 /*

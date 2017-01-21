@@ -660,6 +660,13 @@ static void fill_contig_page_info(struct zone *zone,
 	info->free_blocks_total = 0;
 	info->free_blocks_suitable = 0;
 
+/* IAMROOT-12:
+ * -------------
+ * contig_page_info 정보를 만들어온다.
+ *   - free_blocks_total:	모든 nr_free 수 
+ *   - free_pages:		모든 free 페이지 수
+ *   - free_blocks_suitable:	요청 suitable_order를 처리할 수 있는 수
+ */
 	for (order = 0; order < MAX_ORDER; order++) {
 		unsigned long blocks;
 
@@ -686,12 +693,27 @@ static void fill_contig_page_info(struct zone *zone,
  */
 static int __fragmentation_index(unsigned int order, struct contig_page_info *info)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * 요청 order 상황에서의 파편화 계수를 0 ~ 1000까지 산출한다. 
+ * (0에 가까우면 compactin 실패확률 높고, 1000에 가까우면 성공확률 높아진다)
+ * 단 처리할 페이지가 이미 있는 경우 -1000을 반환한다.
+ */
 	unsigned long requested = 1UL << order;
 
+	/* IAMROOT-12 fehead (2016-11-12):
+	 * --------------------------
+	 * 할당할 메모리가 없다(0 반환)
+	 */
 	if (!info->free_blocks_total)
 		return 0;
 
 	/* Fragmentation index only makes sense when a request would fail */
+	/* IAMROOT-12 fehead (2016-11-12):
+	 * --------------------------
+	 * 할당할수 있는 메모리가 있다(-1000 리턴)
+	 */
 	if (info->free_blocks_suitable)
 		return -1000;
 
@@ -701,6 +723,12 @@ static int __fragmentation_index(unsigned int order, struct contig_page_info *in
 	 * 0 => allocation would fail due to lack of memory
 	 * 1 => allocation would fail due to fragmentation
 	 */
+	/* IAMROOT-12 fehead (2016-11-12):
+	 * --------------------------
+	 * 파편화정도를 반환(1000에 가까우면 파편화가 그만큼 심하고, 0에 가까우
+	 * 면 파편화가 안되어 있고 메모리가 없다.(500 이상이면 메모리 compaction
+	 * 을 진행할수 있는 조건이된다.)
+	 */
 	return 1000 - div_u64( (1000+(div_u64(info->free_pages * 1000ULL, requested))), info->free_blocks_total);
 }
 
@@ -709,7 +737,17 @@ int fragmentation_index(struct zone *zone, unsigned int order)
 {
 	struct contig_page_info info;
 
+/* IAMROOT-12:
+ * -------------
+ * 요청 suitable_order에 대해 처리할 수 있는 갯수 정보를 알아온다.
+ */
 	fill_contig_page_info(zone, order, &info);
+
+/* IAMROOT-12:
+ * -------------
+ * 요청 order 상황에서의 파편화 계수를 0 ~ 1000까지 산출한다. 
+ * 단 처리할 페이지가 이미 있는 경우 -1000을 반환한다.
+ */
 	return __fragmentation_index(order, &info);
 }
 #endif

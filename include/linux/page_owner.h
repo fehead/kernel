@@ -34,6 +34,10 @@ static inline void set_page_owner(struct page *page,
 	__set_page_owner(page, order, gfp_mask);
 }
 #else
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * pi2
+ */
 static inline void reset_page_owner(struct page *page, unsigned int order)
 {
 }

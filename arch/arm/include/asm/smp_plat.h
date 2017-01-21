@@ -82,6 +82,10 @@ static inline int cache_ops_need_broadcast(void)
 /*
  * Logical CPU mapping.
  */
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * rpi2: __cpu_logical_map[] = { 0xf00, 0xf01, 0xf02, 0xf03 }
+ */
 extern u32 __cpu_logical_map[];
 #define cpu_logical_map(cpu)	__cpu_logical_map[cpu]
 /*

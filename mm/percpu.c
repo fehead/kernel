@@ -2108,7 +2108,10 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 
 /* IAMROOT-12AB:
  * -------------
- * 각 unit 페이지들을 활성화된 상태로 비트맵을 초기화
+ * 각 unit 페이지들을 활성화된 상태로 비트맵을 초기화한다 
+ * (first chunk를 만들 때에는 이미 매핑된 lowmem 메모리를 사용했으므로 
+ * 항상 populated 되어 있는 것으로 설정한다. 추가 chunk를 만드는 경우에는 
+ * populate되어 있지 않게 초기화한다.)
  */
 	bitmap_fill(schunk->populated, pcpu_unit_pages);
 	schunk->nr_populated = pcpu_unit_pages;
@@ -2262,6 +2265,12 @@ early_param("percpu_alloc", percpu_alloc_setup);
  * RETURNS:
  * On success, pointer to the new allocation_info is returned.  On
  * failure, ERR_PTR value is returned.
+ */
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * PERCPU_MODULE_RESERVE = 8 << 10, PERCPU_DYNAMIC_RESERVE = 20 << 10
+ * (PERCPU_MODULE_RESERVE, PERCPU_DYNAMIC_RESERVE, PAGE_SIZE, pcpu_dfl_fc_alloc)
+ * pcpu_build_alloc_info(8k, 20k, 4k, pcpu_dfl_fc_alloc);
  */
 static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
 				size_t reserved_size, size_t dyn_size,
@@ -2507,6 +2516,16 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
  * RETURNS:
  * 0 on success, -errno on failure.
  */
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * per-cpu 데이터 영역 할당에 필요한 구성정보를 준비한다.
+ *
+ * PERCPU_MODULE_RESERVE = 8 << 10, PERCPU_DYNAMIC_RESERVE = 20 << 10
+ * rc = pcpu_embed_first_chunk(PERCPU_MODULE_RESERVE,
+ *      	    PERCPU_DYNAMIC_RESERVE, PAGE_SIZE, NULL,
+ *      	    pcpu_dfl_fc_alloc, pcpu_dfl_fc_free);
+ * pcpu_embed_first_chunk(8k, 20k, 4k, NULL, pcpu_dfl_fc_alloc, pcpu_dfl_fc_free);
+ */
 int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 				  size_t atom_size,
 				  pcpu_fc_cpu_distance_fn_t cpu_distance_fn,
@@ -2523,6 +2542,10 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
  * -------------
  * pcpu_alloc_info 구조체 및 그 서브 구조체 정보를 할당하고 구성해온다.
  * (내부에 그룹별로 unit->cpu 매핑을 구성한다)
+ */
+/* IAMROOT-12 fehead (2016-11-28):
+ * --------------------------
+ * pcpu_build_alloc_info(8k, 20k, 4k, pcpu_dfl_fc_alloc);
  */
 	ai = pcpu_build_alloc_info(reserved_size, dyn_size, atom_size,
 				   cpu_distance_fn);
@@ -2811,6 +2834,10 @@ static void __init pcpu_dfl_fc_free(void *ptr, size_t size)
 	memblock_free_early(__pa(ptr), size);
 }
 
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * pi2 :  per-cpu 데이터를 사용할 수 있도록 준비한다.
+ */
 void __init setup_per_cpu_areas(void)
 {
 	unsigned long delta;
@@ -2830,6 +2857,11 @@ void __init setup_per_cpu_areas(void)
  *	- 모듈에서 사용하는 static per-cpu 공간이 8K 밖에 제공되지 않으므로 
  *	  모듈에서 사용량이 많은 경우 추가하여 사용해야 한다.
  * PERCPU_DYNAMIC_RESERVE(32bit=20K, 64bit=28K)
+ */
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * PERCPU_MODULE_RESERVE = 8 << 10, PERCPU_DYNAMIC_RESERVE = 20 << 10
+ * (8k, 20k, 4k, NULL, pcpu_dfl_fc_alloc, pcpu_dfl_fc_free);
  */
 	rc = pcpu_embed_first_chunk(PERCPU_MODULE_RESERVE,
 				    PERCPU_DYNAMIC_RESERVE, PAGE_SIZE, NULL,

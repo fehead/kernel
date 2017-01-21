@@ -13,6 +13,10 @@
 
 /* enough to cover all DEFINE_PER_CPUs in modules */
 #ifdef CONFIG_MODULES
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * pi2
+ */
 #define PERCPU_MODULE_RESERVE		(8 << 10)
 #else
 #define PERCPU_MODULE_RESERVE		0
@@ -51,6 +55,10 @@
 #if BITS_PER_LONG > 32
 #define PERCPU_DYNAMIC_RESERVE		(28 << 10)
 #else
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * pi2
+ */
 #define PERCPU_DYNAMIC_RESERVE		(20 << 10)
 #endif
 
@@ -64,6 +72,11 @@ struct pcpu_group_info {
 						 * entries contain NR_CPUS */
 };
 
+
+/* IAMROOT-12:
+ * -------------
+ * per-cpu first chunk를 구성하기 위한 정보
+ */
 struct pcpu_alloc_info {
 	size_t			static_size;
 	size_t			reserved_size;

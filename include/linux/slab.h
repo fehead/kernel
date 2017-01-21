@@ -149,6 +149,14 @@ size_t ksize(const void *);
  * alignment larger than the alignment of a 64-bit integer.
  * Setting ARCH_KMALLOC_MINALIGN in arch headers allows that.
  */
+
+/* IAMROOT-12:
+ * -------------
+ * rpi2: 
+ *  - ARCH_DMA_MINALIGN:    64 
+ *  - KMALLOC_MIN_SIZE:     64
+ *  - KMALLOC_SHIFT_LOW:    6
+ */
 #if defined(ARCH_DMA_MINALIGN) && ARCH_DMA_MINALIGN > 8
 #define ARCH_KMALLOC_MINALIGN ARCH_DMA_MINALIGN
 #define KMALLOC_MIN_SIZE ARCH_DMA_MINALIGN
@@ -184,6 +192,17 @@ size_t ksize(const void *);
  * SLUB directly allocates requests fitting in to an order-1 page
  * (PAGE_SIZE*2).  Larger requests are passed to the page allocator.
  */
+
+/* IAMROOT-12:
+ * -------------
+ * slub을 사용하는 경우 8K 까지
+ * (rpi2: 이미 KMALLOC_SHIFT_LOW가 이미 6으로 등록됨)
+ */
+/* IAMROOT-12 fehead (2017-01-21):
+ * --------------------------
+ * KMALLOC_SHIFT_HIGH : 13	8k
+ * KMALLOC_SHIFT_MAX  : 23	8M
+ */
 #define KMALLOC_SHIFT_HIGH	(PAGE_SHIFT + 1)
 #define KMALLOC_SHIFT_MAX	(MAX_ORDER + PAGE_SHIFT)
 #ifndef KMALLOC_SHIFT_LOW
@@ -205,10 +224,22 @@ size_t ksize(const void *);
 #endif
 
 /* Maximum allocatable size */
+/* IAMROOT-12 fehead (2017-01-21):
+ * --------------------------
+ * slub : KMALLOC_MAX_SIZE	1 << 23 : 8M
+ */
 #define KMALLOC_MAX_SIZE	(1UL << KMALLOC_SHIFT_MAX)
 /* Maximum size for which we actually use a slab cache */
+/* IAMROOT-12 fehead (2017-01-21):
+ * --------------------------
+ * slub : KMALLOC_MAX_CACHE_SIZE = 1 << 13	8k
+ */
 #define KMALLOC_MAX_CACHE_SIZE	(1UL << KMALLOC_SHIFT_HIGH)
 /* Maximum order allocatable via the slab allocagtor */
+/* IAMROOT-12 fehead (2017-01-21):
+ * --------------------------
+ * slub : KMALLOC_MAX_ORDER	23 - 12 = 11
+ */
 #define KMALLOC_MAX_ORDER	(KMALLOC_SHIFT_MAX - PAGE_SHIFT)
 
 /*
@@ -242,6 +273,10 @@ extern struct kmem_cache *kmalloc_dma_caches[KMALLOC_SHIFT_HIGH + 1];
  * 1 =  65 .. 96 bytes
  * 2 = 120 .. 192 bytes
  * n = 2^(n-1) .. 2^n -1
+ */
+/* IAMROOT-12 fehead (2017-01-21):
+ * --------------------------
+ * 반환 값은 kmalloc_caches 전역변수 참고.
  */
 static __always_inline int kmalloc_index(size_t size)
 {
@@ -323,6 +358,10 @@ kmem_cache_alloc_node_trace(struct kmem_cache *s,
 #endif /* CONFIG_NUMA */
 
 #else /* CONFIG_TRACING */
+/* IAMROOT-12 fehead (2017-01-21):
+ * --------------------------
+ * s : kmalloc_caches 참고
+ */
 static __always_inline void *kmem_cache_alloc_trace(struct kmem_cache *s,
 		gfp_t flags, size_t size)
 {
@@ -570,6 +609,11 @@ extern void *__kmalloc_node_track_caller(size_t, gfp_t, int, unsigned long);
  */
 static inline void *kmem_cache_zalloc(struct kmem_cache *k, gfp_t flags)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * slub 캐시로부터 object를 하나 받아온 후 0으로 초기화한다.
+ */
 	return kmem_cache_alloc(k, flags | __GFP_ZERO);
 }
 

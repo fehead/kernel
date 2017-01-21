@@ -84,6 +84,10 @@ struct static_vm *find_static_vm_vaddr(void *vaddr)
 	return NULL;
 }
 
+/* IAMROOT-12 fehead (2016-11-18):
+ * --------------------------
+ * static_vmlist, vmlist에 할당 정보를 추가한다.
+ */
 void __init add_static_vm_early(struct static_vm *svm)
 {
 	struct static_vm *curr_svm;

@@ -67,11 +67,19 @@ EXPORT_SYMBOL(remove_wait_queue);
  * started to run but is not in state TASK_RUNNING. try_to_wake_up() returns
  * zero in this (rare) case, and we handle it by continuing to scan the queue.
  */
+/* IAMROOT-12 fehead (2016-11-12):
+ * --------------------------
+ * __wake_up_common(q, TASK_INTERRUPTIBLE, 1, 0, NULL)
+ */
 static void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
 			int nr_exclusive, int wake_flags, void *key)
 {
 	wait_queue_t *curr, *next;
 
+/* IAMROOT-12:
+ * -------------
+ * autoremove_wake_function()
+ */
 	list_for_each_entry_safe(curr, next, &q->task_list, task_list) {
 		unsigned flags = curr->flags;
 
@@ -90,6 +98,10 @@ static void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
  *
  * It may be assumed that this function implies a write memory barrier before
  * changing the task state if and only if any tasks are woken up.
+ */
+/* IAMROOT-12 fehead (2016-11-12):
+ * --------------------------
+ * wake_up_interruptible(x)	__wake_up(x, TASK_INTERRUPTIBLE, 1, NULL)
  */
 void __wake_up(wait_queue_head_t *q, unsigned int mode,
 			int nr_exclusive, void *key)

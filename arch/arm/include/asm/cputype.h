@@ -236,6 +236,14 @@ static inline unsigned int __attribute_const__ read_cpuid_tcmstatus(void)
 	return read_cpuid(CPUID_TCM);
 }
 
+/* IAMROOT-12D (2016-03-26):
+ * --------------------------
+ * MPIDR 사용 목적 ?
+ * 멀티 프로세서 시스템에서 스케줄링을 위해 추가 프로세서 식별 메커니즘을
+ * 제공한다.
+ * CPUID_MPIDR = 5
+ * read_cpuid(CPUID_MPIDR) 결과값 = 0x80000F00 
+ */
 static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
 {
 /* IAMROOT-12A:

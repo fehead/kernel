@@ -2,6 +2,10 @@
 #define _LINUX_NUMA_H
 
 
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * 라즈베리파이 NODES_SHIFT = 0
+ */
 #ifdef CONFIG_NODES_SHIFT
 #define NODES_SHIFT     CONFIG_NODES_SHIFT
 #else

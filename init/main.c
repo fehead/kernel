@@ -149,10 +149,43 @@ extern void time_init(void);
 void (*__initdata late_time_init)(void);
 
 /* Untouched command line saved by arch-specific code. */
+/* IAMROOT-12CD (2016-06-16):
+ * --------------------------
+ * boot_command_line =
+ *  dma.dmachans=0x7f35 bcm2708_fb.fbwidth=656 bcm2708_fb.fbheight=416 bcm2709.
+ *  boardrev=0xa01041 bcm2709.serial=0xe467606e smsc95xx.macaddr=B8:27:EB:67:60:6E
+ *  bcm2708_fb.fbswap=1 bcm2709.uart_clock=3000000 bcm2709.disk_led_gpio=47
+ *  bcm2709.disk_led_active_low=0 sdhci-bcm2708.emmc_clock_freq=250000000
+ *  vc_mem.mem_base=0x3dc00000 vc_mem.mem_size=0x3f000000 dwc_otg.pm_enable=0
+ *  console=ttyAMA0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4
+ *  elevator=deadline fsck.repair=yes rootwait
+ *
+ * arch/arm/boot/dts/bcm2709.dtsi
+ *  chosen {
+ *		bootargs = "";
+ *  };
+ *
+ * /boot/cmdline.txt
+ *  dwc_otg.lpm_enable=0 console=serial0,115200 console=tty1 root=/dev/mmcblk0p2
+ *  rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait
+ *
+ * IAMROOT-12 fehead (2016-11-24):
+ * boot_command_line = "rw earlyprintk loglevel=8 console=ttyAMA0,115200 console=tty1 dwc_otg.lpm_enable=0 root=/dev/mmcblk0p2"
+ */
 char __initdata boot_command_line[COMMAND_LINE_SIZE];
 /* Untouched saved command line (eg. for /proc) */
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * "rw earlyprintk loglevel=8 console=ttyAMA0,115200 console
+ *	=tty1 dwc_otg.lpm_enable=0 root=/dev/mmcblk0p2"
+ */
 char *saved_command_line;
 /* Command line for parameter parsing */
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * "rw earlyprintk loglevel=8 console=ttyAMA0,115200 console
+ *	=tty1 dwc_otg.lpm_enable=0 root=/dev/mmcblk0p2"
+ */
 static char *static_command_line;
 /* Command line for per-initcall parameter parsing */
 static char *initcall_command_line;
@@ -386,6 +419,11 @@ static inline void smp_prepare_cpus(unsigned int maxcpus) { }
  * We also need to store the touched command line since the parameter
  * parsing is performed in place, and we should allow a component to
  * store reference of name/value for future reference.
+ */
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * boot_command_line = "rw earlyprintk loglevel=8 console=ttyAMA0,115200 console
+ *	=tty1 dwc_otg.lpm_enable=0 root=/dev/mmcblk0p2"
  */
 static void __init setup_command_line(char *command_line)
 {

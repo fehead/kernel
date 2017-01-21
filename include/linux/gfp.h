@@ -36,12 +36,14 @@ struct vm_area_struct;
 /* IAMROOT-12AB:
  * -------------
  * 할당 중 IO 요청 가능 
+ * (reclaim 불가능(clean 페이지, dirty 페이지), swap 불가능)
  */
 #define ___GFP_IO		0x40u
 
 /* IAMROOT-12AB:
  * -------------
- * 할당 중 File System Call 사용 가능
+ * 할당 중 File System Call 사용 가능 
+ * (reclaim에서 clean 페이지는 가능.(dirty 페이지는 불가능) swap 불가능)
  */
 #define ___GFP_FS		0x80u
 
@@ -166,6 +168,11 @@ struct vm_area_struct;
 #define __GFP_HIGHMEM	((__force gfp_t)___GFP_HIGHMEM)
 #define __GFP_DMA32	((__force gfp_t)___GFP_DMA32)
 #define __GFP_MOVABLE	((__force gfp_t)___GFP_MOVABLE)  /* Page is movable */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * ___GFP_DMA: 0x01u, ___GFP_HIGHMEM: 0x02u, ___GFP_DMA32: 0x04u, ___GFP_MOVABLE: 0x08u
+ * GFP_ZONEMASK = 0xf
+ */
 #define GFP_ZONEMASK	(__GFP_DMA|__GFP_HIGHMEM|__GFP_DMA32|__GFP_MOVABLE)
 /*
  * Action modifiers - doesn't change the zoning
@@ -181,6 +188,22 @@ struct vm_area_struct;
  *
  * __GFP_MOVABLE: Flag that this page will be movable by the page migration
  * mechanism or reclaimed
+ */
+
+/* IAMROOT-12:
+ * -------------
+ * __GFP_THISNODE:
+ *      지정된 노드의 zonelist[1]번을 사용하여 다른 노드의 zone을 사용하지 않게 한다.
+ *
+ * __GFP_MEMALLOC:
+ *      비상용으로 reserve한 영역도 포함해서 사용하게 요청한다.
+ * __GFP_NOMEMALLOC:
+ *      비상용으로 reserve한 영역을 사용하지 못하게 요청한다.
+ */
+
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * __GFP_WAIT	0x10u
  */
 #define __GFP_WAIT	((__force gfp_t)___GFP_WAIT)	/* Can wait and reschedule? */
 #define __GFP_HIGH	((__force gfp_t)___GFP_HIGH)	/* Should access emergency pools? */
@@ -254,12 +277,24 @@ struct vm_area_struct;
 			__GFP_NORETRY|__GFP_MEMALLOC|__GFP_NOMEMALLOC)
 
 /* Control slab gfp mask during early boot */
+
+/* IAMROOT-12:
+ * -------------
+ * 부트 프로세스 동작중에 전체 GFP 비트마스크중 3개(WAIT, IO, FS)를 제거
+ * 아직 스케쥴러가 동작하지 않고, 디바이스 입출력 장치도 준비가 안된 
+ * 상태이기 때문에 해당 기능들을 제거하게 만든다.
+ */
 #define GFP_BOOT_MASK (__GFP_BITS_MASK & ~(__GFP_WAIT|__GFP_IO|__GFP_FS))
 
 /* Control allocation constraints */
 #define GFP_CONSTRAINT_MASK (__GFP_HARDWALL|__GFP_THISNODE)
 
 /* Do not use these with a slab allocator */
+
+/* IAMROOT-12:
+ * -------------
+ * DMA32와 HIGHMEM에서 slub 페이지 할당을 하면 안된다.
+ */
 #define GFP_SLAB_BUG_MASK (__GFP_DMA32|__GFP_HIGHMEM|~__GFP_BITS_MASK)
 
 /* Flag - indicates that the buffer will be suitable for DMA.  Ignored on some
@@ -273,6 +308,13 @@ struct vm_area_struct;
 /* Convert GFP flags to their corresponding migrate type */
 static inline int gfpflags_to_migratetype(const gfp_t gfp_flags)
 {
+/* IAMROOT-12:
+ * -------------
+ * gfp 마스크를 해석하여 mobility를 반환한다.
+ *      0=MIGRATE_UNMOVABLE
+ *      1=MIGRATE_RECLAIMABLE
+ *      2=MIGRATE_MOVABLE
+ */
 	WARN_ON((gfp_flags & GFP_MOVABLE_MASK) == GFP_MOVABLE_MASK);
 
 	if (unlikely(page_group_by_mobility_disabled))
@@ -368,6 +410,17 @@ static inline int gfpflags_to_migratetype(const gfp_t gfp_flags)
  * entry #14: BAD  -
  * entry #15: BAD  -
  */
+/* IAMROOT-12 fehead (2016-12-28):
+ * --------------------------
+ * (ZONE_NORMAL << 0 * ZONES_SHIFT)	0 << 0
+ * | (OPT_ZONE_DMA << ___GFP_DMA * ZONES_SHIFT)	0 <<  1 * 1	0
+ * | (OPT_ZONE_HIGHMEM << ___GFP_HIGHMEM * ZONES_SHIFT) 0 << 2 * 1	0
+ * | (OPT_ZONE_DMA32 << ___GFP_DMA32 * ZONES_SHIFT)	0 << 4 * 1	0
+ * | (ZONE_NORMAL << ___GFP_MOVABLE * ZONES_SHIFT)	0 << 8 * 1	0
+ * | (OPT_ZONE_DMA << (___GFP_MOVABLE | ___GFP_DMA) * ZONES_SHIFT) 0 << 9 * 1 0
+ * | (ZONE_MOVABLE << (___GFP_MOVABLE | ___GFP_HIGHMEM) * ZONES_SHIFT) 1 << 10 * 1 0x400
+ * | (OPT_ZONE_DMA32 << (___GFP_MOVABLE | ___GFP_DMA32) * ZONES_SHIFT) 0 << 12 * 1 0
+ */
 #define GFP_ZONE_TABLE ( \
 	(ZONE_NORMAL << 0 * ZONES_SHIFT)				      \
 	| (OPT_ZONE_DMA << ___GFP_DMA * ZONES_SHIFT)			      \
@@ -401,10 +454,17 @@ static inline int gfpflags_to_migratetype(const gfp_t gfp_flags)
  * GFP_ZONE_TABLE로 부터 요청 gfp 플래그에 해당하는 zone 인덱스 번호를 반환한다. 
  * (시스템에 따라 0 ~ 3까지)
  * (rpi2: 0(ZONE_NORMAL) ~ 1(ZONE_MOVABLE))
+ *
+ * flags에 zone에 대해 아무것도 지정하지 않은 경우 ZONE_NORMAL을 반환한다.
  */
 static inline enum zone_type gfp_zone(gfp_t flags)
 {
 	enum zone_type z;
+	/* IAMROOT-12 fehead (2016-11-25):
+	 * --------------------------
+	 * GFP_ZONEMASK = 0xf, bit = flags & 0xf
+	 * flags = 0x201200, bit = 0
+	 */
 	int bit = (__force int) (flags & GFP_ZONEMASK);
 
 	z = (GFP_ZONE_TABLE >> (bit * ZONES_SHIFT)) &
@@ -439,6 +499,10 @@ static inline int gfp_zonelist(gfp_t flags)
  */
 static inline struct zonelist *node_zonelist(int nid, gfp_t flags)
 {
+/* IAMROOT-12:
+ * -------------
+ * 각 노드에 미리 만들어놓은 zone fallback list
+ */
 	return NODE_DATA(nid)->node_zonelists + gfp_zonelist(flags);
 }
 
@@ -446,6 +510,11 @@ static inline struct zonelist *node_zonelist(int nid, gfp_t flags)
 static inline void arch_free_page(struct page *page, int order) { }
 #endif
 #ifndef HAVE_ARCH_ALLOC_PAGE
+
+/* IAMROOT-12:
+ * -------------
+ * 페이지 할당 시 arm 아키텍처는 아무것도 하지않는다.
+ */
 static inline void arch_alloc_page(struct page *page, int order) { }
 #endif
 
@@ -453,6 +522,10 @@ struct page *
 __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 		       struct zonelist *zonelist, nodemask_t *nodemask);
 
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 예) gfp_mask=0x201200, order=0, zonelist=0x80889800<contig_page_data+2176>
+ */
 static inline struct page *
 __alloc_pages(gfp_t gfp_mask, unsigned int order,
 		struct zonelist *zonelist)
@@ -482,6 +555,13 @@ static inline struct page *alloc_pages_exact_node(int nid, gfp_t gfp_mask,
 extern struct page *alloc_pages_current(gfp_t gfp_mask, unsigned order);
 
 static inline struct page *
+
+/* IAMROOT-12:
+ * -------------
+ * order 페이지를 할당한다. 
+ *      - NUMA: alloc_pages_current() -> 노드 선택 알고리즘 사용
+ *      - UMA:  alloc_pages_node() -> 자기 노드의 버디 시스템에서 할당
+ */
 alloc_pages(gfp_t gfp_mask, unsigned int order)
 {
 	return alloc_pages_current(gfp_mask, order);
@@ -499,6 +579,12 @@ extern struct page *alloc_pages_vma(gfp_t gfp_mask, int order,
 #define alloc_hugepage_vma(gfp_mask, vma, addr, order)	\
 	alloc_pages(gfp_mask, order)
 #endif
+
+/* IAMROOT-12:
+ * -------------
+ * alloc_page(): 1 페이지 할당
+ * alloc_pages(): order 만큼 할당
+ */
 #define alloc_page(gfp_mask) alloc_pages(gfp_mask, 0)
 #define alloc_page_vma(gfp_mask, vma, addr)			\
 	alloc_pages_vma(gfp_mask, 0, vma, addr, numa_node_id(), false)

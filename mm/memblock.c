@@ -52,11 +52,46 @@ static struct memblock_region memblock_physmem_init_regions[INIT_PHYSMEM_REGIONS
  *
  * cnt <- 시작 부터 1로 설정(empty)
  */
+/* IAMROOT-12CD (2016-07-23):
+ * --------------------------
+ * .momory.total_size = 0x3c00 0000 초기값. 약 960M
+ */
+/* IAMROOT-12CD (2016-08-16):
+ * --------------------------
+ * memblock.reserved {
+ *	cnt = 3, max = 128, total_size = 9795242,
+ *	regions[0] = {base = 0x4000(page table), size = 0x4000, flags = 0x0},
+ *	regions[1] = {base = 0x8240(_stext), size = 9737564, flags = 0},
+ *	regions[2] = {base = 0x8000000(fdt), size = 41294, flags = 0},
+ *	regions[3] = {base = 0, size = 0, flags = 0},
+ *	...
+ */
 struct memblock memblock __initdata_memblock = {
+/* IAMROOT-12CD (2016-08-20):
+ * --------------------------
+ * .memory
+ * {cnt = 0x1, max = 0x80, total_size = 0x3c000000, regions = {
+ *   [0] = {base = 0x0, size = 0x3c000000, flags = 0x0}, 0 ~ 960M 영역.
+ *   [1] = {base = 0x0, size = 0x0, flags = 0x0},
+ *   ...
+ * }}
+ */
 	.memory.regions		= memblock_memory_init_regions,
 	.memory.cnt		= 1,	/* empty dummy entry */
 	.memory.max		= INIT_MEMBLOCK_REGIONS,
 
+/* IAMROOT-12CD (2016-08-20):
+ * --------------------------
+ * .reserved
+ * {cnt = 0x4, max = 0x80, total_size = 18183850, regions = {
+ *  [0] = {base = 0x4000, size = 0x4000, flags = 0x0},	page table
+ *  [1] = {base = 0x8240, size = 9737564, flags = 0x0},	커널 영역
+ *  [2] = {base = 0x8000000, size = 41294, flags = 0x0}, fdt 영역
+ *  [3] = {base = 0x3b800000, size = 0x800000, flags = 0x0}, cma(dma) 952M~960M
+ *  [4] = {base = 0x0, size = 0x0, flags = 0x0},
+ *  ...
+ * } }
+ */
 	.reserved.regions	= memblock_reserved_init_regions,
 	.reserved.cnt		= 1,	/* empty dummy entry */
 	.reserved.max		= INIT_MEMBLOCK_REGIONS,
@@ -68,6 +103,9 @@ struct memblock memblock __initdata_memblock = {
 #endif
 
 	.bottom_up		= false,
+	/* IAMROOT-12CD (2016-08-06):
+	 * current_limit = 0x3c000000(960mb)
+	 */
 	.current_limit		= MEMBLOCK_ALLOC_ANYWHERE,
 };
 
@@ -75,6 +113,11 @@ int memblock_debug __initdata_memblock;
 #ifdef CONFIG_MOVABLE_NODE
 bool movable_node_enabled __initdata_memblock = false;
 #endif
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * memblock_allow_resize() 함수에서 호출
+ * memblock_can_resize = 1
+ */
 static int memblock_can_resize __initdata_memblock;
 static int memblock_memory_in_slab __initdata_memblock = 0;
 static int memblock_reserved_in_slab __initdata_memblock = 0;
@@ -1552,6 +1595,10 @@ error:
  *
  * RETURNS:
  * Virtual address of allocated memory block on success, NULL on failure.
+ */
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * pi2
  */
 void * __init memblock_virt_alloc_try_nid_nopanic(
 				phys_addr_t size, phys_addr_t align,

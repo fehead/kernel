@@ -16,6 +16,12 @@
  * -------------
  * zone을 표현하는 비트는 zone이 1=0, 2=1bit, 3~4=2bit, 5이상은 에러
  */
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * 라즈베리파이2
+ *  MAX_NR_ZONES = 2
+ *  ZONES_SHIFT = 1
+ */
 #if MAX_NR_ZONES < 2
 #define ZONES_SHIFT 0
 #elif MAX_NR_ZONES <= 2
@@ -61,6 +67,10 @@
  * -------------
  * 섹션을 포현하는데 사용하는 비트 수
  */
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * SECTIONS_WIDTH = 0
+ */
 #if defined(CONFIG_SPARSEMEM) && !defined(CONFIG_SPARSEMEM_VMEMMAP)
 #define SECTIONS_WIDTH		SECTIONS_SHIFT
 #else
@@ -70,12 +80,20 @@
 /* IAMROOT-12AB:
  * -------------
  * zone을 표현하는 비트는 zone이 1=0, 2=1bit, 3~4=2bit, 5이상은 에러
+ * ZONES_WIDTH = ZONES_SHIFT = 1
  */
 #define ZONES_WIDTH		ZONES_SHIFT
 
 /* IAMROOT-12AB:
  * -------------
  * 노드를 표현하는 비트 수
+ */
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * SECTIONS_WIDTH = 0, ZONES_WIDTH = 1, NODES_SHIFT = 0
+ * BITS_PER_LONG - NR_PAGEFLAGS = 32 - 22
+ *
+ * NODES_WIDTH =  NODES_SHIFT = 0
  */
 #if SECTIONS_WIDTH+ZONES_WIDTH+NODES_SHIFT <= BITS_PER_LONG - NR_PAGEFLAGS
 #define NODES_WIDTH		NODES_SHIFT
@@ -100,9 +118,20 @@
  */
 #define LAST_CPUPID_SHIFT (LAST__PID_SHIFT+LAST__CPU_SHIFT)
 #else
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * 라즈베리파이2
+ */
 #define LAST_CPUPID_SHIFT 0
 #endif
 
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * SECTIONS_WIDTH = 0, ZONES_WIDTH = 1, NODES_SHIFT = 0, LAST_CPUPID_SHIFT = 0
+ * BITS_PER_LONG = 32, NR_PAGEFLAGS	22(0x16)
+ * 
+ * LAST_CPUPID_WIDTH = LAST_CPUPID_SHIFT = 0
+ */
 #if SECTIONS_WIDTH+ZONES_WIDTH+NODES_SHIFT+LAST_CPUPID_SHIFT <= BITS_PER_LONG - NR_PAGEFLAGS
 #define LAST_CPUPID_WIDTH LAST_CPUPID_SHIFT
 #else
@@ -112,6 +141,11 @@
 /*
  * We are going to use the flags for the page to node mapping if its in
  * there.  This includes the case where there is no node, so it is implicit.
+ */
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * 라즈베리파이는 NODES_WIDTH = 1 , NODES_SHIFT 이므로
+ * NODE_NOT_IN_PAGE_FLAGS 정의가 없음.
  */
 #if !(NODES_WIDTH > 0 || NODES_SHIFT == 0)
 #define NODE_NOT_IN_PAGE_FLAGS

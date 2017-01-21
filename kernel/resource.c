@@ -34,6 +34,12 @@ struct resource ioport_resource = {
 };
 EXPORT_SYMBOL(ioport_resource);
 
+/* IAMROOT-12 fehead (2016-11-20):
+ * --------------------------
+ * iomem_resource =
+ * "PCI mem"(0x0 ~ 0xffff_ffff)	- "System RA"(0x0 ~ 0x3bffffff) - kernel_code
+ *								- kernel_data
+ */
 struct resource iomem_resource = {
 	.name	= "PCI mem",
 	.start	= 0,
@@ -338,6 +344,14 @@ struct resource *request_resource_conflict(struct resource *root, struct resourc
  * @new: resource descriptor desired by caller
  *
  * Returns 0 for success, negative error code on error.
+ */
+/* IAMROOT-12 fehead (2016-11-20):
+ * --------------------------
+ * root = &iomem_resource
+ * new->name = "System RAM"
+ * new->start = 0
+ * new->end = 0x3bffffff
+ * new->flags = 0x80000200(IORESOURCE_MEM | IORESOURCE_BUSY)
  */
 int request_resource(struct resource *root, struct resource *new)
 {

@@ -109,6 +109,12 @@ void __init arm_dt_init_cpu_maps(void)
  * MPIDR은 ARM 아키텍처 버전에 따라 implementation이 다르다.
  * ARMv7에서는 affinity level 0가 cpu, 1은 cluster, 2는 사용하지 않는다.
  */
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * read_cpuid(CPUID_MPIDR) 결과값 = 0x80000F00 
+ * MPIDR_HWID_BITMASK  = 0xFFFFFF
+ * mpdir = 0x0f00
+ */
 	u32 mpidr = is_smp() ? read_cpuid_mpidr() & MPIDR_HWID_BITMASK : 0;
 
 	u32 tmp_map[NR_CPUS] = { [0 ... NR_CPUS-1] = MPIDR_INVALID };
@@ -118,6 +124,51 @@ void __init arm_dt_init_cpu_maps(void)
  * -------------
  * unflatten된 디바이스 트리 object에서 /cpus 노드 구조체를 찾아온다.
  */
+	/* IAMROOT-12 fehead (2016-11-24):
+	 * --------------------------
+	 * cpus {
+	 *      #address-cells = <0x1>;
+	 *      #size-cells = <0x0>;
+	 *      linux,phandle = <0x2a>;
+	 *      phandle = <0x2a>;
+
+	 *      cpu@0 {
+	 *          device_type = "cpu";
+	 *          compatible = "arm,cortex-a7";
+	 *          reg = <0xf00>;
+	 *          clock-frequency = <0x2faf0800>;
+	 *          linux,phandle = <0x11>;
+	 *          phandle = <0x11>;
+	 *      };
+
+	 *      cpu@1 {
+	 *          device_type = "cpu";
+	 *          compatible = "arm,cortex-a7";
+	 *          reg = <0xf01>;
+	 *          clock-frequency = <0x2faf0800>;
+	 *          linux,phandle = <0x12>;
+	 *          phandle = <0x12>;
+	 *      };
+
+	 *      cpu@2 {
+	 *          device_type = "cpu";
+	 *          compatible = "arm,cortex-a7";
+	 *          reg = <0xf02>;
+	 *          clock-frequency = <0x2faf0800>;
+	 *          linux,phandle = <0x13>;
+	 *          phandle = <0x13>;
+	 *      };
+
+	 *      cpu@3 {
+	 *          device_type = "cpu";
+	 *          compatible = "arm,cortex-a7";
+	 *          reg = <0xf03>;
+	 *          clock-frequency = <0x2faf0800>;
+	 *          linux,phandle = <0x14>;
+	 *          phandle = <0x14>;
+	 *      };
+	 *  };
+	 */
 	cpus = of_find_node_by_path("/cpus");
 
 	if (!cpus)
@@ -148,6 +199,17 @@ void __init arm_dt_init_cpu_maps(void)
  * -------------
  * cpu 노드에서 "reg" 속성 값을 hwid에 읽어온다.
  */
+		/* IAMROOT-12 fehead (2016-11-24):
+		 * --------------------------
+		 * cpu@0 {
+		 *          device_type = "cpu";
+		 *          compatible = "arm,cortex-a7";
+		 *          reg = <0xf00>;
+		 *          clock-frequency = <0x2faf0800>;
+		 *          linux,phandle = <0x11>;
+		 *          phandle = <0x11>;
+		 *      };
+		 */
 		if (of_property_read_u32(cpu, "reg", &hwid)) {
 			pr_debug(" * %s missing reg property\n",
 				     cpu->full_name);
@@ -157,6 +219,10 @@ void __init arm_dt_init_cpu_maps(void)
 		/*
 		 * 8 MSBs must be set to 0 in the DT since the reg property
 		 * defines the MPIDR[23:0].
+		 */
+		/* IAMROOT-12 fehead (2016-11-24):
+		 * --------------------------
+		 * hwid = 0xf00
 		 */
 		if (hwid & ~MPIDR_HWID_BITMASK)
 			return;
@@ -193,6 +259,10 @@ void __init arm_dt_init_cpu_maps(void)
  * dtb에서 읽어온 hwid와 보조 레지스터에서 읽어온 mpidr 값을 비교
  */
 
+		/* IAMROOT-12 fehead (2016-11-24):
+		 * --------------------------
+		 * hwid = 0xf00, mpidr = 0xf00
+		 */
 		if (hwid == mpidr) {
 			i = 0;
 			bootcpu_valid = true;
@@ -286,6 +356,24 @@ static const void * __init arch_get_next_mach(const char *const **match)
  * If a dtb was passed to the kernel in r2, then use it to choose the
  * correct machine_desc and to setup the system.
  */
+/* IAMROOT-12D (2016-05-26):
+ * --------------------------
+ * static const struct machine_desc __mach_desc_BCM_2709
+ * _used
+ *  __attribute__((__section__(".arch.info.init"))) = {
+ *		.nr     = MACH_TYPE_BCM_2709
+ *		.name   = "BCM_2709",
+ *		.smp		= smp_ops(bcm2709_smp_ops),
+ *		.map_io = bcm2709_map_io,
+ *		.init_irq = bcm2709_init_irq,
+ *		.init_time = bcm2709_timer_init,
+ *		.init_machine = bcm2709_init,
+ *		.init_early = bcm2709_init_early,
+ *		.reserve = board_reserve,
+ *		.restart	= bcm2709_restart,
+ *		.dt_compat = bcm2709_compat,
+ * };
+ */
 const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 {
 	const struct machine_desc *mdesc, *mdesc_best = NULL;
@@ -342,6 +430,10 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
  * 대부분의 머신 디스크립터에는 dt_fixup이 null 인다.
  * (참고 적용 사례: arch/arm/mach-exynos/exynos.c – dt_fixup에 exynos_dt_fixup())
  */
+	/* IAMROOT-12D (2016-06-11):
+	 * --------------------------
+	 * 라즈베리파이2는 dt_fixup 함수가 없음.
+	 */
 	/* We really don't want to do this, but sometimes firmware provides buggy data */
 	if (mdesc->dt_fixup)
 		mdesc->dt_fixup();

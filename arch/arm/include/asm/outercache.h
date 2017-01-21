@@ -116,7 +116,10 @@ static inline void outer_resume(void)
 }
 
 #else
-
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * pi2 용
+ */
 static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
 { }
 static inline void outer_clean_range(phys_addr_t start, phys_addr_t end)

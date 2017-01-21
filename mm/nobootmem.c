@@ -24,6 +24,14 @@
 #include "internal.h"
 
 #ifndef CONFIG_NEED_MULTIPLE_NODES
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * .node_id = 0
+ * .node_start_pfn = 0
+ * .node_present_pages = 0x3c000
+ * .node_spanned_pages = 0x3c000
+ * .node_mem_map = memblock에 메모리 할당
+ */
 struct pglist_data __refdata contig_page_data;
 EXPORT_SYMBOL(contig_page_data);
 #endif

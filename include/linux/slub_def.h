@@ -63,10 +63,27 @@ struct kmem_cache {
 	struct kmem_cache_cpu __percpu *cpu_slab;
 	/* Used for retriving partial slabs etc */
 	unsigned long flags;
+
+/* IAMROOT-12:
+ * -------------
+ * min_partial: 각 노드에서 적절히 유지할 slub 페이지 수
+ */
 	unsigned long min_partial;
 	int size;		/* The size of an object including meta data */
 	int object_size;	/* The size of an object without meta data */
+
+/* IAMROOT-12:
+ * -------------
+ * FP(Free Pointer)까지의 offset가 담긴다.
+ * (poison, track 등의 디버그 정보가 있는 경우에는 FP가 이동되고 그 FP까지의 
+ * offset이 지정되지만 없는 경우에는 0이 대입된다.)
+ */
 	int offset;		/* Free pointer offset. */
+
+/* IAMROOT-12:
+ * -------------
+ * cpu partial 리스트가 적절히 소유할 object 수
+ */
 	int cpu_partial;	/* Number of per cpu partial objects to keep around */
 	struct kmem_cache_order_objects oo;
 
@@ -74,8 +91,27 @@ struct kmem_cache {
 	struct kmem_cache_order_objects max;
 	struct kmem_cache_order_objects min;
 	gfp_t allocflags;	/* gfp flags to use on each alloc */
+	/* IAMROOT-12 fehead (2017-01-21):
+	 * --------------------------
+	 * refcount < 0  We may have set a slab to be unmergeable during bootstrap.
+	 * 만들어질때 1로 설정되며 0이되면 해제한다.
+	 */
 	int refcount;		/* Refcount for slab cache destroy */
 	void (*ctor)(void *);
+/* IAMROOT-12:
+ * -------------
+ * 메타데이터 까지의 offset가 담긴다.
+ * (red-zone 정보가 포함된 size와 동일하고, red-zone이 없는 경우에는 
+ *  포인터 주소 길이로 정렬된 object size와 같다)
+ * (디버그 정보가 있는 경우에는 FP까지의 offset가 담긴 s->offset와 동일하다.)
+ *
+ * 예) 어떠한 디버그 정보도 없는 경우 object_size=5:   size=8, offset=0, inuse=8 
+ *     red-zone만 추가된 경우         object_size=5:   size=8, offset=0, inuse=8
+ *                                    object_size=4:   size=8, offset=0, inuse=8
+ *     poison만 추가된 경우           object_size=5:   size=12, offset=8, inuse=8 
+ *     red-zone+poison 추가된 경우    object_size=5:   size=12, offset=8, inuse=8
+ *                                    onject_size=4:   size=12, offset=8, inuse=8
+ */
 	int inuse;		/* Offset to metadata */
 	int align;		/* Alignment */
 	int reserved;		/* Reserved bytes at the end of slabs */

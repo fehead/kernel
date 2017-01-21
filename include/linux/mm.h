@@ -344,6 +344,9 @@ static inline int get_freepage_migratetype(struct page *page)
 /* IAMROOT-12AB:
  * -------------
  * 페이지 참조 카운터를 감소시킨다. 감소 시킨 결과가 0이면 true를 반환한다.
+ * --------------------------
+ * page->_count -= 1;
+ * return page->_count == 0;
  */
 static inline int put_page_testzero(struct page *page)
 {
@@ -356,6 +359,11 @@ static inline int put_page_testzero(struct page *page)
  * that is the case.
  * This can be called when MMU is off so it must not access
  * any of the virtual mappings.
+ */
+
+/* IAMROOT-12:
+ * -------------
+ * 참조 카운터가 0이 아니면 1 증가 시킨다.
  */
 static inline int get_page_unless_zero(struct page *page)
 {
@@ -478,6 +486,10 @@ static inline struct page *compound_head(struct page *page)
  */
 static inline struct page *compound_head_fast(struct page *page)
 {
+/* IAMROOT-12:
+ * -------------
+ * PG_tail 페이지인 경우 선두 페이지를 가리킨다.
+ */
 	if (unlikely(PageTail(page)))
 		return page->first_page;
 	return page;
@@ -553,6 +565,10 @@ extern bool __get_page_tail(struct page *page);
 
 static inline void get_page(struct page *page)
 {
+/* IAMROOT-12:
+ * -------------
+ * 페이지의 참조 카운터를 증가시킨다.
+ */
 	if (unlikely(PageTail(page)))
 		if (likely(__get_page_tail(page)))
 			return;
@@ -566,6 +582,10 @@ static inline void get_page(struct page *page)
 
 static inline struct page *virt_to_head_page(const void *x)
 {
+/* IAMROOT-12AB:
+ * -------------
+ * 가상주소에 해당하는 page descriptor 주소를 알아온다.
+ */
 	struct page *page = virt_to_page(x);
 
 	/*
@@ -574,6 +594,11 @@ static inline struct page *virt_to_head_page(const void *x)
 	 * already allocated page and this page won't be freed until
 	 * this virt_to_head_page() is finished. So use _fast variant.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * head 페이지를 반환한다. (slub은 head 페이지를 가리킨다)
+ */
 	return compound_head_fast(page);
 }
 
@@ -678,6 +703,8 @@ static inline int compound_order(struct page *page)
  * -------------
  * page.flags: PG_Head가 설정된 경우 compound 페이지의 시작 페이지를 의미한다.
  * page[1].compound_order: order값은 두 번째 페이지에 기록된다.
+ *         page->compound_order와 page->lru와 union으로 사용되며
+ *         page[0]에는 lru로 사용되고, page[1]에는 compound_order로 사용된다. 
  * compound page: order 단위의 복수(order) 페이지로 구성된다.
  */
 
@@ -784,6 +811,13 @@ void do_set_pte(struct vm_area_struct *vma, unsigned long address,
  */
 
 /* Page flags: | [SECTION] | [NODE] | ZONE | [LAST_CPUPID] | ... | FLAGS | */
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * SECTIONS_PGOFF	4*8 - 0 = 32
+ * NODES_PGOFF		32 - 0 = 32
+ * ZONES_PGOFF		32 - 1 = 31
+ * LAST_CPUPID_PGOFF	31 - 0 = 31
+ */
 #define SECTIONS_PGOFF		((sizeof(unsigned long)*8) - SECTIONS_WIDTH)
 #define NODES_PGOFF		(SECTIONS_PGOFF - NODES_WIDTH)
 #define ZONES_PGOFF		(NODES_PGOFF - ZONES_WIDTH)
@@ -795,6 +829,13 @@ void do_set_pte(struct vm_area_struct *vma, unsigned long address,
  * the compiler will optimise away reference to them.
  */
 #define SECTIONS_PGSHIFT	(SECTIONS_PGOFF * (SECTIONS_WIDTH != 0))
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * NODES_WIDTH = 1
+ * NODES_PGSHIFT	= 32 * 0 = 0
+ * ZONES_PGSHIFT	= 31 * 1 = 31
+ * LAST_CPUPID_PGSHIFT	= 31 * 0 = 0
+ */
 #define NODES_PGSHIFT		(NODES_PGOFF * (NODES_WIDTH != 0))
 #define ZONES_PGSHIFT		(ZONES_PGOFF * (ZONES_WIDTH != 0))
 #define LAST_CPUPID_PGSHIFT	(LAST_CPUPID_PGOFF * (LAST_CPUPID_WIDTH != 0))
@@ -821,6 +862,14 @@ void do_set_pte(struct vm_area_struct *vma, unsigned long address,
  * -------------
  * zone, node, 섹션, last_cpupid, zoneid에 필요한 마스크
  */
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * ZONES_MASK		((1UL << 1) - 1)		= 1
+ * NODES_MASK		((1UL << 0) - 1)	= 0
+ * SECTIONS_MASK	((1UL << 0) - 1)	= 0
+ * LAST_CPUPID_MASK	((1UL << 0) - 1) = 
+ * ZONEID_MASK		((1UL << ZONEID_SHIFT) - 1)
+ */
 #define ZONES_MASK		((1UL << ZONES_WIDTH) - 1)
 #define NODES_MASK		((1UL << NODES_WIDTH) - 1)
 #define SECTIONS_MASK		((1UL << SECTIONS_WIDTH) - 1)
@@ -833,9 +882,19 @@ void do_set_pte(struct vm_area_struct *vma, unsigned long address,
  */
 static inline enum zone_type page_zonenum(const struct page *page)
 {
+	/* IAMROOT-12 fehead (2016-10-16):
+	 * --------------------------
+	 * ZONES_PGSHIFT 31, ZONES_MASK 1
+	 * page->flags >> 31 & 1
+	 */
 	return (page->flags >> ZONES_PGSHIFT) & ZONES_MASK;
 }
 
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * 라즈베리파이2는 CONFIG_SPARSEMEM 가 선언 되어 있지 않으므로
+ * SECTION_IN_PAGE_FLAGS 가 선언 되어 있지 않음.
+ */
 #if defined(CONFIG_SPARSEMEM) && !defined(CONFIG_SPARSEMEM_VMEMMAP)
 #define SECTION_IN_PAGE_FLAGS
 #endif
@@ -867,6 +926,10 @@ extern int page_to_nid(const struct page *page);
 #else
 static inline int page_to_nid(const struct page *page)
 {
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * NODES_MASK 가 0이므로 0을 반환.
+ */
 	return (page->flags >> NODES_PGSHIFT) & NODES_MASK;
 }
 #endif
@@ -994,9 +1057,20 @@ static inline bool cpupid_match_pid(struct task_struct *task, int cpupid)
  */
 static inline struct zone *page_zone(const struct page *page)
 {
+	/* IAMROOT-12 fehead (2016-10-16):
+	 * --------------------------
+	 * NODE_DATA(nid)		(&contig_page_data)
+	 * 
+	 * 결국 아래의 코드는 아래와 같이 된다.
+	 * contig_page_data.node_zones[(page->flag >> 31) & 1];
+	 */
 	return &NODE_DATA(page_to_nid(page))->node_zones[page_zonenum(page)];
 }
 
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * 라즈베리파이2 는 아래와 관계 없음.
+ */
 #ifdef SECTION_IN_PAGE_FLAGS
 static inline void set_page_section(struct page *page, unsigned long section)
 {

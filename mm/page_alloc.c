@@ -127,6 +127,15 @@ unsigned long totalcma_pages __read_mostly;
 unsigned long dirty_balance_reserve __read_mostly;
 
 int percpu_pagelist_fraction;
+/* IAMROOT-12:
+ * -------------
+ * 부트업 타임에는 3개(wait, io, fs) 플래그를 제거하여 동작시키며,
+ * 나중에 부트업이 끝나면 다시 전체 access가 가능하게 한다.
+ */
+/* IAMROOT-12 fehead (2016-10-22):
+ * --------------------------
+ * gfp_allowed_mask = 0x1ffff2f
+ */
 gfp_t gfp_allowed_mask __read_mostly = GFP_BOOT_MASK;
 
 #ifdef CONFIG_PM_SLEEP
@@ -258,6 +267,10 @@ EXPORT_SYMBOL(nr_node_ids);
 EXPORT_SYMBOL(nr_online_nodes);
 #endif
 
+/* IAMROOT-12:
+ * -------------
+ * page_group_by_mobility_disabled가 설정되는 경우 unmovable로만 동작
+ */
 int page_group_by_mobility_disabled __read_mostly;
 
 void set_pageblock_migratetype(struct page *page, int migratetype)
@@ -1305,6 +1318,11 @@ int move_freepages(struct zone *zone,
 	unsigned long order;
 	int pages_moved = 0;
 
+/* IAMROOT-12:
+ * -------------
+ * start_page부터 end_page까지 버디 시스템에서 관리하는 모든 페이지들을 
+ * 요청한 migratetype으로 옮긴다.
+ */
 #ifndef CONFIG_HOLES_IN_ZONE
 	/*
 	 * page_zone is not safe to call in this context when
@@ -1325,12 +1343,21 @@ int move_freepages(struct zone *zone,
 			continue;
 		}
 
+/* IAMROOT-12:
+ * -------------
+ * 버디 시스템에서 관리하지 않는 페이지는 skip
+ */
 		if (!PageBuddy(page)) {
 			page++;
 			continue;
 		}
 
 		order = page_order(page);
+
+/* IAMROOT-12:
+ * -------------
+ * 기존에 있던 리스트에서 꺼내와서 지정한 migratetype으로 옮긴다.
+ */
 		list_move(&page->lru,
 			  &zone->free_area[order].free_list[migratetype]);
 		set_freepage_migratetype(page, migratetype);
@@ -1374,6 +1401,10 @@ int move_freepages_block(struct zone *zone, struct page *page,
 	if (!zone_spans_pfn(zone, end_pfn))
 		return 0;
 
+/* IAMROOT-12:
+ * -------------
+ * 해당 페이지블럭의 모든 버디 페이지들을 migratetype으로 옮긴다.
+ */
 	return move_freepages(zone, start_page, end_page, migratetype);
 }
 
@@ -1427,6 +1458,10 @@ static void try_to_steal_freepages(struct zone *zone, struct page *page,
 		return;
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * 오더가 작으면서 movable인 경우는 옮기지 않는다.
+ */
 	if (current_order >= pageblock_order / 2 ||
 	    start_type == MIGRATE_RECLAIMABLE ||
 	    start_type == MIGRATE_UNMOVABLE ||
@@ -1458,6 +1493,13 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 	struct page *page;
 
 	/* Find the largest possible block of pages in the other list */
+
+/* IAMROOT-12:
+ * -------------
+ * 스틸링에서는 큰 order를 가져온다.
+ * 어짜피 해당 migratetype이 부족해서 가져와야 하기 때문에 큰 걸 가져와야 
+ * 다음에 또 필요할 때 여러번 스틸링하는 것을 막는다.
+ */
 	for (current_order = MAX_ORDER-1;
 				current_order >= order && current_order <= MAX_ORDER-1;
 				--current_order) {
@@ -1467,6 +1509,11 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 			int buddy_type = start_migratetype;
 
 			/* MIGRATE_RESERVE handled later if necessary */
+
+/* IAMROOT-12:
+ * -------------
+ * fallback에서 MIGRATE_RESERVE를 만나면 더 이상 스틸할 수 없는 것을 의미한다.
+ */
 			if (migratetype == MIGRATE_RESERVE)
 				break;
 
@@ -1496,6 +1543,10 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 			list_del(&page->lru);
 			rmv_page_order(page);
 
+/* IAMROOT-12:
+ * -------------
+ * 큰 오더로 스틸하기 때문에 필요한 order만큼으로 expand 시켜서 사용한다.
+ */
 			expand(zone, page, order, current_order, area,
 					buddy_type);
 
@@ -1812,8 +1863,16 @@ void mark_free_pages(struct zone *zone)
  * Free a 0-order page
  * cold == true ? free a cold page : free a hot page
  */
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * free_hot_cold_page(page, false);
+ */
 void free_hot_cold_page(struct page *page, bool cold)
 {
+	/* IAMROOT-12 fehead (2016-10-16):
+	 * --------------------------
+	 * zone = contig_page_data.node_zones[0];
+	 */
 	struct zone *zone = page_zone(page);
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
@@ -1903,6 +1962,10 @@ void split_page(struct page *page, unsigned int order)
 	VM_BUG_ON_PAGE(PageCompound(page), page);
 	VM_BUG_ON_PAGE(!page_count(page), page);
 
+/* IAMROOT-12:
+ * -------------
+ * order 페이지를 order 0 페이지로 모두 분리한다.
+ */
 #ifdef CONFIG_KMEMCHECK
 	/*
 	 * Split shadow pages too, because free(page[0]) would
@@ -1911,6 +1974,12 @@ void split_page(struct page *page, unsigned int order)
 	if (kmemcheck_page_is_tracked(page))
 		split_page(virt_to_page(page[0].shadow), order);
 #endif
+
+
+/* IAMROOT-12:
+ * -------------
+ * 페이지의 참조카운터를 1로 설정하여 사용중으로 설정한다.
+ */
 
 	set_page_owner(page, 0, 0);
 	for (i = 1; i < (1 << order); i++) {
@@ -1922,6 +1991,11 @@ EXPORT_SYMBOL_GPL(split_page);
 
 int __isolate_free_page(struct page *page, unsigned int order)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * 해당 페이지를 버디에서 분리하고 페이지 수를 반환한다.
+ */
 	unsigned long watermark;
 	struct zone *zone;
 	int mt;
@@ -1931,6 +2005,12 @@ int __isolate_free_page(struct page *page, unsigned int order)
 	zone = page_zone(page);
 	mt = get_pageblock_migratetype(page);
 
+/* IAMROOT-12:
+ * -------------
+ * 페이지 블럭이 isolate 타입이 아닌 경우 low 워터마크에 현재 페이지 수 만큼 
+ * 추가하여 워터마크 체크를 수행하여 여전히 메모리 부족인 경우 0으로 
+ * 함수를 빠져나간다.
+ */
 	if (!is_migrate_isolate(mt)) {
 		/* Obey watermarks as if the page was being allocated */
 		watermark = low_wmark_pages(zone) + (1 << order);
@@ -1941,11 +2021,22 @@ int __isolate_free_page(struct page *page, unsigned int order)
 	}
 
 	/* Remove page from free list */
+
+/* IAMROOT-12:
+ * -------------
+ * 관리하던 버디 리스트에서 제거한다.
+ */
 	list_del(&page->lru);
 	zone->free_area[order].nr_free--;
 	rmv_page_order(page);
 
 	/* Set the pageblock if the isolated page is at least a pageblock */
+
+/* IAMROOT-12:
+ * -------------
+ * 페이지블럭의 절반 이상의 order를 가진 페이지의 경우 속해있는 모든 페이지 
+ * 블럭의 migrate 타입을 모두 MIGRATE_MOVABLE로 변경한다.
+ */
 	if (order >= pageblock_order - 1) {
 		struct page *endpage = page + (1 << order) - 1;
 		for (; page < endpage; page += pageblock_nr_pages) {
@@ -1977,12 +2068,21 @@ int split_free_page(struct page *page)
 
 	order = page_order(page);
 
+/* IAMROOT-12:
+ * -------------
+ * 요청 페이지를 버디에서 분리하고 페이지 수를 알아온다.
+ */
 	nr_pages = __isolate_free_page(page, order);
 	if (!nr_pages)
 		return 0;
 
 	/* Split into individual pages */
 	set_page_refcounted(page);
+
+/* IAMROOT-12:
+ * -------------
+ * order 페이지를 order 0 페이지로 모두 분리한다.
+ */
 	split_page(page, order);
 	return nr_pages;
 }
@@ -2073,7 +2173,8 @@ struct page *buffered_rmqueue(struct zone *preferred_zone,
  * NR_ALLOC_BATCH 카운터를 요청한 order 페이지 수 만큼 감소시킨다.
  * (zone의 free page 갯수가 담김)
  *
- * 이 값이 0이하가 되는 경우 zone->flags에 ZONE_FAIR_DEPLETED 플래그를 설정한다.
+ * 이 값이 0이하가 되는 경우 zone->flags에 ZONE_FAIR_DEPLETED 플래그를 설정하여 
+ * 해당 zone을 다 할당하였다고 보고한다. (해당 zone에 대한 free 페이지 고갈 상태)
  */
 	__mod_zone_page_state(zone, NR_ALLOC_BATCH, -(1 << order));
 	if (atomic_long_read(&zone->vm_stat[NR_ALLOC_BATCH]) <= 0 &&
@@ -2125,6 +2226,13 @@ __setup("fail_page_alloc=", setup_fail_page_alloc);
 
 static bool should_fail_alloc_page(gfp_t gfp_mask, unsigned int order)
 {
+/* IAMROOT-12:
+ * -------------
+ * CONFIG_FAIL_PAGE_ALLOC 커널 옵션을 사용하는 경우에 동작한다.
+ *
+ * fail인 경우 should_fail()루틴을 호출하지 않고 false를 리턴하여 정상적인 메모리 할당 루틴을 
+ * 동작하게 한다.
+ */
 	if (order < fail_page_alloc.min_order)
 		return false;
 	if (gfp_mask & __GFP_NOFAIL)
@@ -2139,6 +2247,10 @@ static bool should_fail_alloc_page(gfp_t gfp_mask, unsigned int order)
 
 #ifdef CONFIG_FAULT_INJECTION_DEBUG_FS
 
+/* IAMROOT-12:
+ * -------------
+ * /debug/fs/ignore-gfp-wait
+ */
 static int __init fail_page_alloc_debugfs(void)
 {
 	umode_t mode = S_IFREG | S_IRUSR | S_IWUSR;
@@ -2172,6 +2284,10 @@ late_initcall(fail_page_alloc_debugfs);
 
 #else /* CONFIG_FAIL_PAGE_ALLOC */
 
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * pi2
+ */
 static inline bool should_fail_alloc_page(gfp_t gfp_mask, unsigned int order)
 {
 	return false;
@@ -2193,18 +2309,54 @@ static bool __zone_watermark_ok(struct zone *z, unsigned int order,
 	long free_cma = 0;
 
 	free_pages -= (1 << order) - 1;
+
+/* IAMROOT-12:
+ * -------------
+ * 인터럽트 핸들러등에서 GFP_ATOMIC(__GFP_HIGH)으로 요청을 하는 경우 
+ * 높은 우선 처리 요청을 한 경우인데 이 때 min 값을 절반으로 줄여 성공 확률을 높인다.
+ */
 	if (alloc_flags & ALLOC_HIGH)
 		min -= min / 2;
+
+/* IAMROOT-12:
+ * -------------
+ * slowpath 페이지 할당의 특정 요건에서 더 빠르게 처리해야 할 때 
+ * ALLOC_HARDER를 사용하여 min 값을 25% 줄여 성공 확률을 높인다.
+ */
 	if (alloc_flags & ALLOC_HARDER)
 		min -= min / 4;
+
+/* IAMROOT-12:
+ * -------------
+ * ALLOC_CMA(movable 타입) 요청을 하지 않은 경우 free CMA 페이지들을 알아온다.
+ */
 #ifdef CONFIG_CMA
 	/* If allocation can't use CMA areas don't use free CMA pages */
 	if (!(alloc_flags & ALLOC_CMA))
 		free_cma = zone_page_state(z, NR_FREE_CMA_PAGES);
 #endif
 
+/* IAMROOT-12:
+ * -------------
+ * unmovable이나 reclaimable 타입으로 할당 요청이 온 경우에는 free cma 영역은 
+ * 할당 할 수 없으므로 남은 free 페이지에서 감소시켜 워터마크와 비교해야 한다.
+ *
+ * 워터마크 값에 lowmem_reserve 영역을 더해서 비교한다.
+ * (lowmem_reserve도 보호해야하기 때문)
+ */
 	if (free_pages - free_cma <= min + z->lowmem_reserve[classzone_idx])
 		return false;
+
+/* IAMROOT-12:
+ * -------------
+ * 하위 order 페이지들은 free 페이지 계산에서 빼고 워터마크와 비교하는 것이 
+ * 목적인데 약간의 오류가 있어서 커널 v4.4-rc1에서 변경되었다.
+ */
+/* IAMROOT-12 fehead (2016-11-05):
+ * --------------------------
+ * free_pages 가 min(min water mark) 보다 많아야 할당 할수 있고
+ * 아래 코드를 실행한다.
+ */
 	for (o = 0; o < order; o++) {
 		/* At the next order, this order's pages become unavailable */
 		free_pages -= z->free_area[o].nr_free << o;
@@ -2225,11 +2377,27 @@ bool zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 					zone_page_state(z, NR_FREE_PAGES));
 }
 
+/* IAMROOT-12 fehead (2016-11-12):
+ * --------------------------
+ * 정밀도를 높이기위해 각 cpu별로 저장되어 있는 freepage 개수를 모두 더해 
+ * free page개수를 구한다음 watermark 체크를 한다.
+ */
 bool zone_watermark_ok_safe(struct zone *z, unsigned int order,
 			unsigned long mark, int classzone_idx, int alloc_flags)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * 워터마크 ok 체크를 위해서 free 페이지가 기준 이하로 내려가면 zone 카운터에 대해
+ * 더 정확히 비교를 하도록 한다.
+ */
 	long free_pages = zone_page_state(z, NR_FREE_PAGES);
 
+/* IAMROOT-12:
+ * -------------
+ * free 페이지가 zone의 percpu_drift_mark 보다 작으면 엄밀하게 zone 카운터를 
+ * 읽어오도록 한다.
+ */
 	if (z->percpu_drift_mark && free_pages < z->percpu_drift_mark)
 		free_pages = zone_page_state_snapshot(z, NR_FREE_PAGES);
 
@@ -2302,6 +2470,10 @@ static nodemask_t *zlc_setup(struct zonelist *zonelist, int alloc_flags)
  * We are low on memory in the second scan, and should leave no stone
  * unturned looking for a free page.
  */
+/* IAMROOT-12 fehead (2016-10-29):
+ * --------------------------
+ * zlc(zonelist cache)을 scan할 가치가 있는가?
+ */
 static int zlc_zone_worth_trying(struct zonelist *zonelist, struct zoneref *z,
 						nodemask_t *allowednodes)
 {
@@ -2309,14 +2481,34 @@ static int zlc_zone_worth_trying(struct zonelist *zonelist, struct zoneref *z,
 	int i;				/* index of *z in zonelist zones */
 	int n;				/* node that zone *z is on */
 
+
+/* IAMROOT-12:
+ * -------------
+ * zone list cache를 사용하지 않는 경우 1로 종료
+ * (NUMA 시스템이 아닌 경우 zlc를 사용하지 않는다)
+ */
 	zlc = zonelist->zlcache_ptr;
 	if (!zlc)
 		return 1;
 
+/* IAMROOT-12:
+ * -------------
+ * zonelist->_zonerefs[i] = z와 동일
+ */
 	i = z - zonelist->_zonerefs;
+
+/* IAMROOT-12:
+ * -------------
+ * node id를 구해온다.
+ */
 	n = zlc->z_to_n[i];
 
 	/* This zone is worth trying if it is allowed but not full */
+
+/* IAMROOT-12:
+ * -------------
+ * fullzone 비트맵의 i번째 비트가 0인 경우 성공(zone이 가득 차지 않은 경우)
+ */
 	return node_isset(n, *allowednodes) && !test_bit(i, zlc->fullzones);
 }
 
@@ -2359,6 +2551,11 @@ static bool zone_local(struct zone *local_zone, struct zone *zone)
 	return local_zone->node == zone->node;
 }
 
+/* IAMROOT-12:
+ * -------------
+ * 두 zone이 있는 노드끼리의 거리가 너무 멀면 false 
+ * (이러한 노드는 reclaim에서 사용하지 않는다.)
+ */
 static bool zone_allows_reclaim(struct zone *local_zone, struct zone *zone)
 {
 	return node_distance(zone_to_nid(local_zone), zone_to_nid(zone)) <
@@ -2402,6 +2599,13 @@ static void reset_alloc_batches(struct zone *preferred_zone)
 {
 	struct zone *zone = preferred_zone->zone_pgdat->node_zones;
 
+/* IAMROOT-12:
+ * -------------
+ * preferred_zone이 있는 노드의 zone에 대해 루프를 돈다.
+ *
+ * NR_ALLOC_BATCH zone 카운터를 high - low 워터마크 페이지 수로 설정하고, 
+ * ZONE_FAIR_DEPLETED 플래그를 설정하여 할당할 free 페이지가 남았다고 보고한다.
+ */
 	do {
 		mod_zone_page_state(zone, NR_ALLOC_BATCH,
 			high_wmark_pages(zone) - low_wmark_pages(zone) -
@@ -2425,6 +2629,12 @@ get_page_from_freelist(gfp_t gfp_mask, unsigned int order, int alloc_flags,
 	nodemask_t *allowednodes = NULL;/* zonelist_cache approximation */
 	int zlc_active = 0;		/* set if using zonelist_cache */
 	int did_zlc_setup = 0;		/* just call zlc_setup() one time */
+
+/* IAMROOT-12:
+ * -------------
+ * __GFP_WRITE 플래그가 사용된 경우 write용 파일 캐시 목적으로 페이지 할당을 
+ * 요청할 경우 (fastpath 페이지 할당 시 ALLOC_WMARK_LOW를 사용)
+ */
 	bool consider_zone_dirty = (alloc_flags & ALLOC_WMARK_LOW) &&
 				(gfp_mask & __GFP_WRITE);
 	int nr_fair_skipped = 0;
@@ -2437,13 +2647,31 @@ zonelist_scan:
 	 * Scan zonelist, looking for a zone with enough free.
 	 * See also __cpuset_node_allowed() comment in kernel/cpuset.c.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * iteration 출력: zone 포인터와 z(zoneref 포인터)
+ * filter 항목: ac->high_zoneidx 초과 zone, ac->nodemask에 포함되지 않은 노드
+ */
 	for_each_zone_zonelist_nodemask(zone, z, zonelist, ac->high_zoneidx,
 								ac->nodemask) {
 		unsigned long mark;
 
+/* IAMROOT-12:
+ * -------------
+ * zlc를 검사하여 해당 zone이 가득차 있는지 검사한다. (1=full, 0=ok)
+ * 가득차 있는 경우 해당 zone을 skip한다.
+ */
 		if (IS_ENABLED(CONFIG_NUMA) && zlc_active &&
 			!zlc_zone_worth_trying(zonelist, z, allowednodes))
 				continue;
+
+/* IAMROOT-12:
+ * -------------
+ * cpuset 사용이 enable 되었고 alloc_flags에 ALLOC_CPUSET을 주어 cpuset 검사를 
+ * 요청한 경우 해당 zone에 대한 노드를 찾아 cpuset을 이용하여 사용 가능한 상태가 
+ * 아닌 경우 skip 한다. (cpuset 부적격 zone에 대해 skip)
+ */
 		if (cpusets_enabled() &&
 			(alloc_flags & ALLOC_CPUSET) &&
 			!cpuset_zone_allowed(zone, gfp_mask))
@@ -2454,9 +2682,31 @@ zonelist_scan:
 		 * page was allocated in should have no effect on the
 		 * time the page has in memory before being reclaimed.
 		 */
+/* IAMROOT-12 fehead (2016-11-05):
+ * --------------------------
+ * ALLOC_FAIR 는 Fastpath 에서만 쓰임.
+ */
 		if (alloc_flags & ALLOC_FAIR) {
+
+/* IAMROOT-12:
+ * -------------
+ * 현재 zone의 노드가 preferred_zone이 사용하는 노드가 아닌 경우
+ * fallback을 사용하지 않고 break한다.
+ *
+ * 그 이후 루프의 아래 루틴에서 다시 ALLOC_FAIR 플래그를 제거하고 1회 재시도를 한다.
+ */
 			if (!zone_local(ac->preferred_zone, zone))
 				break;
+
+/* IAMROOT-12:
+ * -------------
+ * 해당 zone의 free 페이지가 없는 경우 공정하게 처리할 여력이 없으므로 
+ * nr_fair_skipped 카운터를 증가시키고 다음 zone으로 skip
+ */
+			/* IAMROOT-12 fehead (2016-10-29):
+			 * --------------------------
+			 * deplete : 비우다.
+			 */
 			if (test_bit(ZONE_FAIR_DEPLETED, &zone->flags)) {
 				nr_fair_skipped++;
 				continue;
@@ -2488,19 +2738,64 @@ zonelist_scan:
 		 * will require awareness of zones in the
 		 * dirty-throttling and the flusher threads.
 		 */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 쓰기를 위해 페이지 캐시 페이지를 할당 할 때, 우리는 더티 한도 내에서 존을 가
+ * 져오고 싶습니다. 따라서 하나의 존이 전역 적으로 허용 된 더티 페이지의 비례 지
+ * 분 이상을 보유하지는 않습니다. 더티 제한은 kswapd가 LRU 목록의 페이지를 작
+ * 성하지 않고도 균형을 유지할 수 있도록 영역의 저급 예약 및 높은 워터 마크를 고
+ * 려합니다.
+ *
+ * 이는 더 높은 영역이 가득 차기 전에 할당이 실패하여 더 낮은 영역에 대한 압박을
+ * 증가시킬 수있는 것처럼 보일 수 있습니다. 그러나이 똑같은 메커니즘으로 하위 구
+ * 역이 보호되므로 넘쳐나는 페이지는 제한적입니다. 실용적인 부담이되어서는 안됩니다.
+ *
+ * XXX : 현재로서는 재 할당을하기 전에 느린 경로 (ALLOC_WMARK_LOW 설정 해제)의
+ * 영역 별 더티 제한을 초과 할 수있는 할당을 허용합니다. 이는 NUMA 설정시 허용되
+ * 는 영역이 함께 전역 제한에 도달 할만큼 크지 않을 때 중요합니다. 이러한 상황을
+ * 적절하게 해결하려면 더러운 스로틀과 플러 셔 스레드에서 영역을 인식해야합니다.
+ */
+
+/* IAMROOT-12:
+ * -------------
+ * dirty(write용 파일 캐시) 페이지 할당 요청 및 워터마크 제한을 사용하는 경우 
+ * 일정 분량의 zone dirty 제한 값 이내에서만 할당이 가능하도록 한다.
+ */
 		if (consider_zone_dirty && !zone_dirty_ok(zone))
 			continue;
 
+/* IAMROOT-12:
+ * -------------
+ * ALLOC 관련한 플래그들 중 3가지만 통과(MIN, LOW, HIGH)
+ * (ALLOC_NO_WATERMARKS(4)는 통과시키지 않는다)
+ */
 		mark = zone->watermark[alloc_flags & ALLOC_WMARK_MASK];
+
+/* IAMROOT-12:
+ * -------------
+ * 남은 free 페이지가 요청 order를 처리하도라도 워터마크보다 큰지 체크한다.
+ * (단 order가 1이상인 경우는 관련 order에 대한 버디리스트도 추가로 체크한다)
+ */
 		if (!zone_watermark_ok(zone, order, mark,
 				       ac->classzone_idx, alloc_flags)) {
 			int ret;
 
 			/* Checked here to keep the fast path fast */
 			BUILD_BUG_ON(ALLOC_NO_WATERMARKS < NR_WMARK);
+
+/* IAMROOT-12:
+ * -------------
+ * 워터마크 기준 이하라 하더라도 ALLOC_NO_WATERMARKS 플래그가 요청되어 
+ * 비상 상황인 경우 어떠한 영역이든 가리지 않고 시스템에서 할당을 시도한다.
+ */
 			if (alloc_flags & ALLOC_NO_WATERMARKS)
 				goto try_this_zone;
 
+/* IAMROOT-12:
+ * -------------
+ * 2개 이상의 노드가 있는 NUMA 시스템에서 did_zlc_setup이 
+ * false(함수 내부에서 첫 시도)인 경우
+ */
 			if (IS_ENABLED(CONFIG_NUMA) &&
 					!did_zlc_setup && nr_online_nodes > 1) {
 				/*
@@ -2513,6 +2808,12 @@ zonelist_scan:
 				did_zlc_setup = 1;
 			}
 
+/* IAMROOT-12:
+ * -------------
+ * NUMA가 아닌 경우 무조건 full 처리 
+ * 권장 zone의 노드와 처리하고자 하는 zone의 노드간 거리가 너무 멀리 떨어져 있는 
+ * 경우 해당 zone을 zlc를 통해 full 처리하고 skip한다.
+ */
 			if (zone_reclaim_mode == 0 ||
 			    !zone_allows_reclaim(ac->preferred_zone, zone))
 				goto this_zone_full;
@@ -2521,6 +2822,12 @@ zonelist_scan:
 			 * As we may have just activated ZLC, check if the first
 			 * eligible zone has failed zone_reclaim recently.
 			 */
+
+/* IAMROOT-12:
+ * -------------
+ * NUMA에서 해당 zone에 대한 zlc(zonelist cache)가 설정되어 있으면 free 페이지가 없다 
+ * 판단하여 skip 한다.
+ */
 			if (IS_ENABLED(CONFIG_NUMA) && zlc_active &&
 				!zlc_zone_worth_trying(zonelist, z, allowednodes))
 				continue;
@@ -2548,6 +2855,12 @@ zonelist_scan:
 				 * when the watermark is between the low and
 				 * min watermarks.
 				 */
+
+/* IAMROOT-12:
+ * -------------
+ * ALLOC_WMARK_MIN 요청에서 실패한 경우이거나 약간의 페이지 밖에 회수가 안된 경우는 
+ * zlc에 zone이 full 되었음을 알린다. 그 외의 경우는 zlc full 처리 없이 skip 한다.
+ */
 				if (((alloc_flags & ALLOC_WMARK_MASK) == ALLOC_WMARK_MIN) ||
 				    ret == ZONE_RECLAIM_SOME)
 					goto this_zone_full;
@@ -2565,6 +2878,11 @@ try_this_zone:
 			return page;
 		}
 this_zone_full:
+
+/* IAMROOT-12:
+ * -------------
+ * zlc 캐시에 현재 zone이 full 되었음을 마크한다.
+ */
 		if (IS_ENABLED(CONFIG_NUMA) && zlc_active)
 			zlc_mark_zone_full(zonelist, z);
 	}
@@ -2577,12 +2895,28 @@ this_zone_full:
 	 * include remote zones now, before entering the slowpath and waking
 	 * kswapd: prefer spilling to a remote zone over swapping locally.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * ALLOC_FAIR 플래그를 사용한 경우 ALLOC_FAIR 플래그를 제거하고 아래 2가지 조건중
+ * 하나를 만족한 경우 리스캔을 시도한다.
+ */
 	if (alloc_flags & ALLOC_FAIR) {
 		alloc_flags &= ~ALLOC_FAIR;
+
+/* IAMROOT-12:
+ * -------------
+ * ZONE_FAIR_DEPLETED 플래그를 사용한 경우 nr_fair_skipped가 증가되었었다.
+ */
 		if (nr_fair_skipped) {
 			zonelist_rescan = true;
 			reset_alloc_batches(ac->preferred_zone);
 		}
+
+/* IAMROOT-12:
+ * -------------
+ * 온라인 노드가 여러 개인 경우 재스캔
+ */
 		if (nr_online_nodes > 1)
 			zonelist_rescan = true;
 	}
@@ -2782,6 +3116,11 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 	if (!order)
 		return NULL;
 
+/* IAMROOT-12:
+ * -------------
+ * compaction을 하는 동안 페이지 할당이 필요하여 비상용 reserve 메모리를 
+ * 사용할 수 있도록 현재 태스크에 PF_MEMALLOC 플래그를 설정한다.
+ */
 	current->flags |= PF_MEMALLOC;
 	compact_result = try_to_compact_pages(gfp_mask, order, alloc_flags, ac,
 						mode, contended_compaction);
@@ -2913,6 +3252,11 @@ __alloc_pages_high_priority(gfp_t gfp_mask, unsigned int order,
 		page = get_page_from_freelist(gfp_mask, order,
 						ALLOC_NO_WATERMARKS, ac);
 
+/* IAMROOT-12:
+ * -------------
+ * __GFP_NOFAIL 요청인 경우 페이지 할당을 실패하더라도 잠시 20ms 쉬었다가
+ * 다시 시도한다.
+ */
 		if (!page && gfp_mask & __GFP_NOFAIL)
 			wait_iff_congested(ac->preferred_zone, BLK_RW_ASYNC,
 									HZ/50);
@@ -2934,7 +3278,18 @@ static void wake_all_kswapds(unsigned int order, const struct alloc_context *ac)
 static inline int
 gfp_to_alloc_flags(gfp_t gfp_mask)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * slowpath 첫 시도시 기본 옵션으로 min 워터마크 및 cpuset을 사용하게 한다.
+ */
 	int alloc_flags = ALLOC_WMARK_MIN | ALLOC_CPUSET;
+
+/* IAMROOT-12:
+ * -------------
+ * atomic 요청이 있는지 확인한다. 
+ * (wait이 있는 경우 sleep 가능)
+ */
 	const bool atomic = !(gfp_mask & (__GFP_WAIT | __GFP_NO_KSWAPD));
 
 	/* __GFP_HIGH is assumed to be the same as ALLOC_HIGH to save a branch. */
@@ -2946,6 +3301,11 @@ gfp_to_alloc_flags(gfp_t gfp_mask)
 	 * policy or is asking for __GFP_HIGH memory.  GFP_ATOMIC requests will
 	 * set both ALLOC_HARDER (atomic == true) and ALLOC_HIGH (__GFP_HIGH).
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * high(빠른 우선 처리) 요청이 있는 경우 alloc_flags에도 사용
+ */
 	alloc_flags |= (__force int) (gfp_mask & __GFP_HIGH);
 
 	if (atomic) {
@@ -2953,6 +3313,14 @@ gfp_to_alloc_flags(gfp_t gfp_mask)
 		 * Not worth trying to allocate harder for __GFP_NOMEMALLOC even
 		 * if it can't schedule.
 		 */
+
+/* IAMROOT-12:
+ * -------------
+ * atomic인데도 비상용 메모리를 사용하지 못하게 요청한 경우 더 페이지 할당에
+ * 분발하도록 한다.
+ *
+ * atomic 요청 시에는 cpuset을 사용하지 못하게 한다.
+ */
 		if (!(gfp_mask & __GFP_NOMEMALLOC))
 			alloc_flags |= ALLOC_HARDER;
 		/*
@@ -2960,19 +3328,51 @@ gfp_to_alloc_flags(gfp_t gfp_mask)
 		 * comment for __cpuset_node_allowed().
 		 */
 		alloc_flags &= ~ALLOC_CPUSET;
+
+/* IAMROOT-12:
+ * -------------
+ * atomic 요청이 아니지만 커널 스레드에서 요청한 경우 이 때에도 분발한다.
+ */
 	} else if (unlikely(rt_task(current)) && !in_interrupt())
 		alloc_flags |= ALLOC_HARDER;
 
+/* IAMROOT-12:
+ * -------------
+ * 비상용 reserve 메모리를 사용하지 말라고 요청한 경우가 아니라면 
+ */
 	if (likely(!(gfp_mask & __GFP_NOMEMALLOC))) {
+
+/* IAMROOT-12:
+ * -------------
+ * 비상용 reserve 메모리를 사용해도 좋다라는 요청인 경우 no 워터마크 플래그를 
+ * 적용한다.
+ */
 		if (gfp_mask & __GFP_MEMALLOC)
 			alloc_flags |= ALLOC_NO_WATERMARKS;
+
+/* IAMROOT-12:
+ * -------------
+ * softirq 핸들링중이면서 현재 태스크에 PF_MEMALLOC이 붙어 있는 경우 no 워터마크 적용 
+ * (사례: RX 네트워크 패킷 처리중에 PF_MEMALLOC 붙여서 요청)
+ */
 		else if (in_serving_softirq() && (current->flags & PF_MEMALLOC))
 			alloc_flags |= ALLOC_NO_WATERMARKS;
+
+/* IAMROOT-12:
+ * -------------
+ * 태스크에서 할당 요청 중이면서 태스크에 PF_MEMALLOC 플래그 요청하거나 
+ * 태스크가 dead 되어가는 중인 경우 no 워터마크 적용
+ */
 		else if (!in_interrupt() &&
 				((current->flags & PF_MEMALLOC) ||
 				 unlikely(test_thread_flag(TIF_MEMDIE))))
 			alloc_flags |= ALLOC_NO_WATERMARKS;
 	}
+
+/* IAMROOT-12:
+ * -------------
+ * movable 타입인 경우 ALLOC_CMA 플래그를 주어 CMA 영역에서도 할당할 수 있게 한다.
+ */
 #ifdef CONFIG_CMA
 	if (gfpflags_to_migratetype(gfp_mask) == MIGRATE_MOVABLE)
 		alloc_flags |= ALLOC_CMA;
@@ -2989,6 +3389,12 @@ static inline struct page *
 __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 						struct alloc_context *ac)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * __GFP_WAIT이 요청된 경우 sleep 가능하다. 이 때 페이지 회수가 가능하다.
+ * 추후 커널에서는 __GFP_RECLAIM으로 변경된다.
+ */
 	const gfp_t wait = gfp_mask & __GFP_WAIT;
 	struct page *page = NULL;
 	int alloc_flags;
@@ -3017,11 +3423,21 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	 * allowed per node queues are empty and that nodes are
 	 * over allocated.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * slowpath에 들어와서 GFP_THISNODE 요청을 하는 경우 noway.
+ */
 	if (IS_ENABLED(CONFIG_NUMA) &&
 	    (gfp_mask & GFP_THISNODE) == GFP_THISNODE)
 		goto nopage;
 
 retry:
+
+/* IAMROOT-12:
+ * -------------
+ * __GFP_NO_KSWAPD 플래그가 요청되지 않은 경우 필요한 kswapds들을 깨운다.
+ */
 	if (!(gfp_mask & __GFP_NO_KSWAPD))
 		wake_all_kswapds(order, ac);
 
@@ -3030,12 +3446,24 @@ retry:
 	 * reclaim. Now things get more complex, so set up alloc_flags according
 	 * to how we want to proceed.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * gfp 플래그 상태를 분석하여 alloc 플래그를 만들어준다
+ * (워터마크 경계를 없애거나, MIN으로 주거나, ALLOC_HARDER, ... 
+ */
 	alloc_flags = gfp_to_alloc_flags(gfp_mask);
 
 	/*
 	 * Find the true preferred zone if the allocation is unconstrained by
 	 * cpusets.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * slowpath에서는 atomic 호출을 하는 경우 cpuset을 제거하게 되는데 이러한 경우 
+ * fastpath 때와 조건이 바뀌어서 권장 zone이 바뀔 수도 있으므로 다시 알아온다.
+ */
 	if (!(alloc_flags & ALLOC_CPUSET) && !ac->nodemask) {
 		struct zoneref *preferred_zoneref;
 		preferred_zoneref = first_zones_zonelist(ac->zonelist,
@@ -3043,13 +3471,28 @@ retry:
 		ac->classzone_idx = zonelist_zone_idx(preferred_zoneref);
 	}
 
+/* IAMROOT-12 fehead (2016-11-12):
+ * --------------------------
+ * fastpath에서 한번 시도하고 여기서 두번째 호출
+ */
 	/* This is the last chance, in general, before the goto nopage. */
+
+/* IAMROOT-12:
+ * -------------
+ * no 워터마크 옵션을 빼고, 즉 min 워터마크만 가지고 페이지 할당을 시도한다(2nd try).
+ */
 	page = get_page_from_freelist(gfp_mask, order,
 				alloc_flags & ~ALLOC_NO_WATERMARKS, ac);
 	if (page)
 		goto got_pg;
 
 	/* Allocate without watermarks if the context allows */
+
+/* IAMROOT-12:
+ * -------------
+ * no 워터마크가 주어진 경우 다시 페이지 할당을 시도한다(3rd try)
+ * (__GFP_NOFAIL 플래그 요청인 경우 페이지 할당이 될 때 까지 무한 반복)
+ */
 	if (alloc_flags & ALLOC_NO_WATERMARKS) {
 		/*
 		 * Ignore mempolicies if ALLOC_NO_WATERMARKS on the grounds
@@ -3066,6 +3509,10 @@ retry:
 	}
 
 	/* Atomic allocations - we can't balance anything */
+/* IAMROOT-12:
+ * -------------
+ * sleep 가능하지 않는 경우 최종 에러 처리로 이동한다.
+ */
 	if (!wait) {
 		/*
 		 * All existing users of the deprecated __GFP_NOFAIL are
@@ -3077,10 +3524,19 @@ retry:
 	}
 
 	/* Avoid recursion of direct reclaim */
+/* IAMROOT-12:
+ * -------------
+ * direct-reclaim의 재귀 호출을 피하기 위해 현재 태스크가 PF_MEMALLOC 요청 중인 경우 
+ * 에러 처리로 이동한다.
+ */
 	if (current->flags & PF_MEMALLOC)
 		goto nopage;
 
 	/* Avoid allocations with no watermarks from looping endlessly */
+/* IAMROOT-12:
+ * -------------
+ * 현재 태스크가 dying 이면서 __GFP_NOFAIL이 아닌 경우 에러 처리로 이동
+ */
 	if (test_thread_flag(TIF_MEMDIE) && !(gfp_mask & __GFP_NOFAIL))
 		goto nopage;
 
@@ -3184,6 +3640,21 @@ got_pg:
 /*
  * This is the 'heart' of the zoned buddy allocator.
  */
+
+/* IAMROOT-12:
+ * -------------
+ * nodemask:
+ *      - 할당 가능 노드를 의미하며,
+ *	- null인 경우 전체 노드를 대상으로 할당한다.
+ *	- 노드 비트맵이 설정된 경우 해당 노드만을 대상으로 할당한다.
+ */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 예) gfp_mask=0x201200, order=0, zonelist=0x80889800<contig_page_data+2176>
+ * nodemask=0x0
+ * zonelist = {zlcache_ptr = 0x0, _zonerefs = {{zone = 0x80888f80, zone_idx = 0x0},
+ *	{zone = 0x0, zone_idx = 0x0}, {zone = 0x0, zone_idx = 0x0}}}
+ */
 struct page *
 __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 			struct zonelist *zonelist, nodemask_t *nodemask)
@@ -3191,20 +3662,58 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 	struct zoneref *preferred_zoneref;
 	struct page *page = NULL;
 	unsigned int cpuset_mems_cookie;
+/* IAMROOT-12 fehead (2016-11-05):
+ * --------------------------
+ * ALLOC_WMARK_LOW : low memory water mark 아래에서 할당을 받아라.
+ * ALLOC_CPUSET : cgrpup 에 적용되어 있다면 해당 cpuset 에 맞게.
+ * ALLOC_FAIR : 되도록이면 fall list zone list가 아닌 지정된 영역에서 할당 받음.
+ * alloc_flags는 Fastpath 일때 쓰이는 flag이다.
+ */
 	int alloc_flags = ALLOC_WMARK_LOW|ALLOC_CPUSET|ALLOC_FAIR;
 	gfp_t alloc_mask; /* The gfp_t that was actually used for allocation */
+
+/* IAMROOT-12:
+ * -------------
+ * 할당 요청 사항을 ac에 저장한다
+ *
+ * .high_zoneidx: gfp_mask에서 지정된 zone(rpi2: 0(ZONE_NORMAL) ~ 1(ZONE_MOVABLE))
+ */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 예) ac = {zonelist = 0x0, nodemask = 0(ZONE_NORMAL), preferred_zone = 0x0,
+ *	classzone_idx = 0x0, migratetype = 0x0(MIGRATE_UNMOVABLE),
+ *	high_zoneidx = 0(ZONE_NORMAL)}
+ */
 	struct alloc_context ac = {
 		.high_zoneidx = gfp_zone(gfp_mask),
 		.nodemask = nodemask,
 		.migratetype = gfpflags_to_migratetype(gfp_mask),
 	};
 
+/* IAMROOT-12:
+ * -------------
+ * 부트업 타임에는 wait, fs, io가 동작하지 않도록 제한한다.
+ */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * gfp_allowed_mask = 0x1ffff2f
+ * gfp_mask = ftp_mask = 0x201200
+ */
 	gfp_mask &= gfp_allowed_mask;
 
 	lockdep_trace_alloc(gfp_mask);
 
+/* IAMROOT-12:
+ * -------------
+ * PREEMPT_VOLUANTRY 커널 옵션을 사용하는 경우 양보에 의해 높은 우선순위 요청 태스크에 
+ * preemption을 허용한다. 물론 __GFP_WAIT가 요청된 경우.
+ */
 	might_sleep_if(gfp_mask & __GFP_WAIT);
 
+/* IAMROOT-12:
+ * -------------
+ * CONFIG_FAIL_PAGE_ALLOC 커널 옵션을 사용하는 경우 디버그 용도로 사용한다.
+ */
 	if (should_fail_alloc_page(gfp_mask, order))
 		return NULL;
 
@@ -3213,34 +3722,98 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 	 * valid zone. It's possible to have an empty zonelist as a result
 	 * of GFP_THISNODE and a memoryless node
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * GFP_THISNODE로 요청되었으며 해당 노드가 메모리가 없는 노드인 경우 zonelist가 
+ * 비어 있을 수 있다. 이 때문에 할당이 안되는 케이스가 발생한다.
+ */
 	if (unlikely(!zonelist->_zonerefs->zone))
 		return NULL;
 
+/* IAMROOT-12:
+ * -------------
+ * CMA를 사용할 때 movable 타입을 요청하는 경우 alloc_flags에 ALLOC_CMA를 추가하는 이유
+ *   -> CMA 영역을 movable 요청에 대해서만 허락하여 공간을 효율적으로 사용하도록 한다.
+ *      나중에 CMA 공간에 대해 할당 요청이 발생하는 경우 free 페이지가 부족하면 movable 
+ *      속성의 페이지들을 다른 곳으로 이주 시킬 수 있다.(빈번하지 않기 때문에 이런 식으로 
+ *      운용을 하는 것이 효율적이다)
+ */
 	if (IS_ENABLED(CONFIG_CMA) && ac.migratetype == MIGRATE_MOVABLE)
 		alloc_flags |= ALLOC_CMA;
 
 retry_cpuset:
+
+/* IAMROOT-12:
+ * -------------
+ * NUMA에서 메모리 정책이 바뀌었는지 확인하기 위해 리드 시퀀스 락을 사용한다.
+ * 메모리 할당이 실패한 동안에 메모리 정책이 바뀐 경우 이 루틴으로 다시 
+ * 재진입할 수 있도록 한다.
+ */
 	cpuset_mems_cookie = read_mems_allowed_begin();
 
 	/* We set it here, as __alloc_pages_slowpath might have changed it */
+
+/* IAMROOT-12:
+ * -------------
+ * ac.zonelist는 slowpath에서 바뀌므로 루프를 돌아 다시 재시도하는 경우를 위해 
+ * 처음 요청한 zonelist 인수에서 받은 값을 다시 적용한다.
+ * cpuset_current_mems_allowed: 현재 task에 허용되는 메모리 노드
+ */
 	ac.zonelist = zonelist;
 	/* The preferred zone is used for statistics later */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 선호 zone은 나중에 통계로 사용된다.
+ * 예) ac = {zonelist=contig_page_data.zonelist, nodemask = 0(ZONE_NORMAL),
+ *	preferred_zone = 0x0, classzone_idx = 0x0, migratetype = 0x0(MIGRATE_UNMOVABLE),
+ *	high_zoneidx = 0(ZONE_NORMAL)}
+ */
 	preferred_zoneref = first_zones_zonelist(ac.zonelist, ac.high_zoneidx,
 				ac.nodemask ? : &cpuset_current_mems_allowed,
 				&ac.preferred_zone);
+
+/* IAMROOT-12:
+ * -------------
+ * 조건에 맞는 zone이 없는 경우 out으로 이동
+ */
 	if (!ac.preferred_zone)
 		goto out;
+
+/* IAMROOT-12:
+ * -------------
+ * preferred_zoneref에서 zone_idx(0~3)
+ */
+/* IAMROOT-12 fehead (2016-12-29):
+ * --------------------------
+ * pi2: ac.classzone_idx = (ZONE_NORMAL, or ZONE_MOVABLE)
+ */
 	ac.classzone_idx = zonelist_zone_idx(preferred_zoneref);
 
 	/* First allocation attempt */
+
+/* IAMROOT-12:
+ * -------------
+ * Fastpath:
+ *	- 처음 get_page_from_freelist() 함수를 호출할 때 __GFP_HARDWALL을 사용한다.
+ */
 	alloc_mask = gfp_mask|__GFP_HARDWALL;
 	page = get_page_from_freelist(alloc_mask, order, alloc_flags, &ac);
 	if (unlikely(!page)) {
+		/* IAMROOT-12 fehead (2016-11-05):
+		 * --------------------------
+		 * 빠른 메모리 할당이 실패했을때 여기가 실행됨 메모리 회수,
+		 * 메모리 compaction등을 행하여 메모리를 확보할듯 싶다.
+		 */
 		/*
 		 * Runtime PM, block IO and its error handling path
 		 * can deadlock because I/O on the device might not
 		 * complete.
 		 */
+/* IAMROOT-12:
+ * -------------
+ * 현재 태스크가 io 처리를 하지 못하게 막은 경우 페이지 회수 시스템이 동작하지 못한다.
+ */
 		alloc_mask = memalloc_noio_flags(gfp_mask);
 
 		page = __alloc_pages_slowpath(alloc_mask, order, &ac);
@@ -3258,6 +3831,12 @@ out:
 	 * the mask is being updated. If a page allocation is about to fail,
 	 * check if the cpuset changed during allocation and if so, retry.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * NUMA에서 사용되는 메모리 정책이 변경된 경우 시퀀스가 변경되므로 페이지 
+ * 할당이 실패한 경우 다시 한 번 시도를 하도록 기회를 준다.
+ */
 	if (unlikely(!page && read_mems_allowed_retry(cpuset_mems_cookie)))
 		goto retry_cpuset;
 
@@ -3291,6 +3870,10 @@ unsigned long get_zeroed_page(gfp_t gfp_mask)
 }
 EXPORT_SYMBOL(get_zeroed_page);
 
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * #define __free_page(page) __free_pages((page), 0)
+ */
 void __free_pages(struct page *page, unsigned int order)
 {
 
@@ -3833,6 +4416,10 @@ static int build_zonelists_node(pg_data_t *pgdat, struct zonelist *zonelist,
 
 /* zonelist order in the kernel.
  * set_zonelist_order() will set this to NODE or ZONE.
+ */
+/* IAMROOT-12 fehead (2016-12-10):
+ * --------------------------
+ #define ZONELIST_ORDER_ZONE     2
  */
 static int current_zonelist_order = ZONELIST_ORDER_DEFAULT;
 static char zonelist_order_name[3][8] = {"Default", "Node", "Zone"};
@@ -5430,6 +6017,11 @@ static unsigned long __meminit zone_absent_pages_in_node(int nid,
 }
 
 #else /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * pi2: return zone_size[0]
+ * zones_size = {0x3c000, 0x0}
+ */
 static inline unsigned long __meminit zone_spanned_pages_in_node(int nid,
 					unsigned long zone_type,
 					unsigned long node_start_pfn,
@@ -5461,6 +6053,12 @@ static inline unsigned long __meminit zone_absent_pages_in_node(int nid,
 
 #endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
 
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * 빈공간를 포함한 페이지 사이즈(pgdat->spanned_pages)와
+ * 실재 메모리 페이지 사이즈(pgdat->present_pages)를 구한다.
+ * (&contig_page_data, 0, 0, {0x3c000, 0x0}, {0x0, 0x0})
+ */
 static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
 						unsigned long node_start_pfn,
 						unsigned long node_end_pfn,
@@ -5475,7 +6073,18 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
  * 지정된 노드에서 zone별로 spanned_pages(hole을 포함한)를 산출한다.
  * 산출하여 노드->node_spanned_pages에 저장한다.
  */
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * i= ZONE_NORMAL ~ ZONE_MOVABLE
+	 */
 	for (i = 0; i < MAX_NR_ZONES; i++)
+		/* IAMROOT-12 fehead (2017-01-02):
+		 * --------------------------
+		 * zones_size = {0x3c000, 0x0}
+		 * totalpages += zones_size[0]
+		 * totalpages += zones_size[1]
+		 * totalpages = 0x3c000
+		 */
 		totalpages += zone_spanned_pages_in_node(pgdat->node_id, i,
 							 node_start_pfn,
 							 node_end_pfn,
@@ -5488,12 +6097,22 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
  * 산출하고 realtotalpages에서 감소시킨다.
  * 산출하여 노드->node_present_pages에 저장한다.
  */
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * realtotalpages = 0x3c000, zholes_size = {0x0, 0x0}
+	 * realtotalpages -= zholes_size[0]
+	 * realtotalpages -= zholes_size[1]
+	 */
 	realtotalpages = totalpages;
 	for (i = 0; i < MAX_NR_ZONES; i++)
 		realtotalpages -=
 			zone_absent_pages_in_node(pgdat->node_id, i,
 						  node_start_pfn, node_end_pfn,
 						  zholes_size);
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * realtotalpages = 0x3c000
+	 */
 	pgdat->node_present_pages = realtotalpages;
 	printk(KERN_DEBUG "On node %d totalpages: %lu\n", pgdat->node_id,
 							realtotalpages);
@@ -5629,11 +6248,19 @@ static unsigned long __paginginit calc_memmap_size(unsigned long spanned_pages,
  *
  * NOTE: pgdat should get zeroed by caller.
  */
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * (&contig_page_data, 0, 0, {0x3c000, 0x0}, {0x0, 0x0})
+ */
 static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 		unsigned long node_start_pfn, unsigned long node_end_pfn,
 		unsigned long *zones_size, unsigned long *zholes_size)
 {
 	enum zone_type j;
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * nid = 0, zone_start_pfn = 0
+	 */
 	int nid = pgdat->node_id;
 	unsigned long zone_start_pfn = pgdat->node_start_pfn;
 	int ret;
@@ -5644,6 +6271,11 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 	pgdat->numabalancing_migrate_nr_pages = 0;
 	pgdat->numabalancing_migrate_next_window = jiffies;
 #endif
+/* IAMROOT-12 fehead (2016-11-12):
+ * --------------------------
+ * kswapd_wait : 메모리 회수 데몬
+ * pfmemalloc_wait : 비상 메모리 할당 데몬.
+ */
 	init_waitqueue_head(&pgdat->kswapd_wait);
 	init_waitqueue_head(&pgdat->pfmemalloc_wait);
 
@@ -5654,6 +6286,10 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 	pgdat_page_ext_init(pgdat);
 
 	for (j = 0; j < MAX_NR_ZONES; j++) {
+		/* IAMROOT-12 fehead (2017-01-02):
+		 * --------------------------
+		 * zone = contig_page_data.node_zones[0-1]
+		 */
 		struct zone *zone = pgdat->node_zones + j;
 		unsigned long size, realsize, freesize, memmap_pages;
 
@@ -5781,6 +6417,7 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 /* IAMROOT-12AB:
  * -------------
  * zone->lruvec를 초기화한다.
+ * lruvec 아마 유저태스크에서 메모리가 회수 가능한 것들만 가지고 있을것이다.
  */
 		lruvec_init(&zone->lruvec);
 		if (!size)
@@ -5818,6 +6455,12 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 	}
 }
 
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * 총 페이지 개수만큼 struct page를 할당하여 pgdat->node_mem_map에 할당하고
+ * 전역변수 mem_map에도 포인팅.
+ * pgdat = &contig_page_data
+ */
 static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
 {
 	/* Skip empty nodes */
@@ -5831,6 +6474,10 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
  */
 #ifdef CONFIG_FLAT_NODE_MEM_MAP
 	/* ia64 gets its own node_mem_map, before this, without bootmem */
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * contig_page_data.node_mem_map = 0
+	 */
 	if (!pgdat->node_mem_map) {
 		unsigned long size, start, end;
 		struct page *map;
@@ -5846,6 +6493,13 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
  * 지정된 노드의 범위를 mem_map으로 만들 때 mem_map[]의 갯수가 
  * 1024개 페이지 단위로 정렬한다. 
  */
+		/* IAMROOT-12 fehead (2017-01-02):
+		 * --------------------------
+		 * start = 0
+		 * end = 0x3c000
+		 * size = 0x3c000 * 0x24(36) = 0x870000(8847360, 8.44M)
+		 * map = NULL
+		 */
 		start = pgdat->node_start_pfn & ~(MAX_ORDER_NR_PAGES - 1);
 		end = pgdat_end_pfn(pgdat);
 		end = ALIGN(end, MAX_ORDER_NR_PAGES);
@@ -5860,6 +6514,9 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
  * 실제 노드의 시작 주소를 가리킬 때에는 mem_map에서 그 오차 페이지
  * 수 만큼 위를 가리키게 해야 한다.
  * (따라서 mem_map[]의 위아래는 사용안되는 영역이 있을 수 있다.)
+ *
+ * node_mem_map에 map의 가상 주소가 있는데 이 값에 물리주소 pfn 값을 
+ * enconding 하여 사용한다.
  */
 		pgdat->node_mem_map = map + (pgdat->node_start_pfn - start);
 	}
@@ -5878,9 +6535,17 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
 #endif /* CONFIG_FLAT_NODE_MEM_MAP */
 }
 
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * nid = 0, zone_size = {0x3c000, 0x0}, node_start_pfn = 0, zhole_size = {0x0, 0x0}
+ */
 void __paginginit free_area_init_node(int nid, unsigned long *zones_size,
 		unsigned long node_start_pfn, unsigned long *zholes_size)
 {
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * pgdat = &contig_page_data
+	 */
 	pg_data_t *pgdat = NODE_DATA(nid);
 	unsigned long start_pfn = 0;
 	unsigned long end_pfn = 0;
@@ -5888,6 +6553,10 @@ void __paginginit free_area_init_node(int nid, unsigned long *zones_size,
 	/* pg_data_t should be reset to zero when it's allocated */
 	WARN_ON(pgdat->nr_zones || pgdat->classzone_idx);
 
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * contig_page_data.node_id = 0, contig_page_data.node_start_pfn = 0
+	 */
 	pgdat->node_id = nid;
 	pgdat->node_start_pfn = node_start_pfn;
 #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
@@ -5904,6 +6573,10 @@ void __paginginit free_area_init_node(int nid, unsigned long *zones_size,
  * -------------
  * 노드->node_spanned_pages와 노드->node_present_pages를 산출한다.
  */
+	/* IAMROOT-12 fehead (2017-01-02):
+	 * --------------------------
+	 * (&contig_page_data, 0, 0, {0x3c000, 0x0}, {0x0, 0x0})
+	 */
 	calculate_node_totalpages(pgdat, start_pfn, end_pfn,
 				  zones_size, zholes_size);
 

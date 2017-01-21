@@ -1588,6 +1588,11 @@ struct task_struct {
  * mems_allowed: 허용 노드 비트맵(현재 태스크에 대해 노드를 제한하는 비트 마스크)
  */
 	nodemask_t mems_allowed;	/* Protected by alloc_lock */
+
+/* IAMROOT-12:
+ * -------------
+ * 각 태스크별로 메모리에 관련된 시퀀스 락
+ */
 	seqcount_t mems_allowed_seq;	/* Seqence no to catch updates */
 	int cpuset_mem_spread_rotor;
 	int cpuset_slab_spread_rotor;
@@ -1616,6 +1621,12 @@ struct task_struct {
 #endif
 #ifdef CONFIG_NUMA
 	struct mempolicy *mempolicy;	/* Protected by alloc_lock */
+
+/* IAMROOT-12:
+ * -------------
+ * il_next: (interleave_next)
+ *      현재 태스크에서 interleave policy 모드인 경우 다음 사용할 노드 id 값을 저장한다.
+ */
 	short il_next;
 	short pref_node_fork;
 #endif
@@ -1975,6 +1986,11 @@ extern void thread_group_cputime_adjusted(struct task_struct *p, cputime_t *ut, 
 /*
  * Per process flags
  */
+
+/* IAMROOT-12:
+ * -------------
+ * PF_MEMALLOC: 응급상황에서 포기하지 않고 메모리를 회수해서라도 할당을 요청
+ */
 #define PF_EXITING	0x00000004	/* getting shut down */
 #define PF_EXITPIDONE	0x00000008	/* pi exit done on shut down */
 #define PF_VCPU		0x00000010	/* I'm a virtual CPU */
@@ -2033,6 +2049,10 @@ extern void thread_group_cputime_adjusted(struct task_struct *p, cputime_t *ut, 
  */
 static inline gfp_t memalloc_noio_flags(gfp_t flags)
 {
+/* IAMROOT-12:
+ * -------------
+ * 현재 태스크가 io 처리를 하지 못하게 막은 경우 페이지 회수 시스템이 동작하지 못한다.
+ */
 	if (unlikely(current->flags & PF_MEMALLOC_NOIO))
 		flags &= ~(__GFP_IO | __GFP_FS);
 	return flags;

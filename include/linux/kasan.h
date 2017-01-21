@@ -55,6 +55,10 @@ void kasan_free_shadow(const struct vm_struct *vm);
 
 #else /* CONFIG_KASAN */
 
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * pi2
+ */
 static inline void kasan_unpoison_shadow(const void *address, size_t size) {}
 
 static inline void kasan_enable_current(void) {}

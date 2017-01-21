@@ -271,6 +271,10 @@ struct kmem_cache *find_mergeable(size_t size, size_t align,
  * Figure out what the alignment of the objects will be given a set of
  * flags, a user specified alignment and the size of the objects.
  */
+/* IAMROOT-12 fehead (2016-12-03):
+ * --------------------------
+ * flags=SLAB_HWCACHE_ALIGN(8192), ARCH_KMALLOC_MINALIGN=64, size=32
+ */
 unsigned long calculate_alignment(unsigned long flags,
 		unsigned long align, unsigned long size)
 {
@@ -281,12 +285,34 @@ unsigned long calculate_alignment(unsigned long flags,
 	 * The hardware cache alignment cannot override the specified
 	 * alignment though. If that is greater then use it.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * 요청한 align과 계산된 ralign 값 중 큰 수로 align 한다.
+ *	(계산된 ralign: size보다 같거나 큰 2의 차수 값)
+ *
+ * 예1)	align=32, size=28, 캐시라인=128
+ *      align=32
+ * 예2) align=64, size=28, 캐시라인=128 
+ *      align=64
+ * rpi2) align=64, size=16, 캐시라인=64 
+ *       align=64
+ */
 	if (flags & SLAB_HWCACHE_ALIGN) {
+		/* IAMROOT-12 fehead (2016-12-03):
+		 * --------------------------
+		 * pi2: size=32, ralign = 64, align = 64
+		 */
 		unsigned long ralign = cache_line_size();
 		while (size <= ralign / 2)
 			ralign /= 2;
 		align = max(align, ralign);
 	}
+
+/* IAMROOT-12:
+ * -------------
+ * 요청 align이 ARCH_SLAB_MINALIGN(rpi2:8)보다 작은 경우 8로 설정
+ */
 
 	if (align < ARCH_SLAB_MINALIGN)
 		align = ARCH_SLAB_MINALIGN;
@@ -674,6 +700,11 @@ int slab_is_available(void)
 
 #ifndef CONFIG_SLOB
 /* Create a cache during boot when no slab services are available yet */
+/* IAMROOT-12 fehead (2016-12-03):
+ * --------------------------
+ * s = &boot_kmem_cache_node, name = "kmem_cache_node",
+	size = sizeof(struct kmem_cache_node) = 32, flags = SLAB_HWCACHE_ALIGN
+ */
 void __init create_boot_cache(struct kmem_cache *s, const char *name, size_t size,
 		unsigned long flags)
 {
@@ -681,8 +712,23 @@ void __init create_boot_cache(struct kmem_cache *s, const char *name, size_t siz
 
 	s->name = name;
 	s->size = s->object_size = size;
+
+
+/* IAMROOT-12:
+ * -------------
+ * object 정렬 단위를 산출한다.
+ */
+	/* IAMROOT-12 fehead (2016-12-03):
+	 * --------------------------
+	 * flags=SLAB_HWCACHE_ALIGN(0x2000), ARCH_KMALLOC_MINALIGN=64, size=32
+	 * s->align = ARCH_KMALLOC_MINALIGN(64)
+	 */
 	s->align = calculate_alignment(flags, ARCH_KMALLOC_MINALIGN, size);
 
+	/* IAMROOT-12 fehead (2016-12-03):
+	 * --------------------------
+	 * pi2는 아무것도 하지않음.
+	 */
 	slab_init_memcg_params(s);
 
 	err = __kmem_cache_create(s, flags);
@@ -694,6 +740,10 @@ void __init create_boot_cache(struct kmem_cache *s, const char *name, size_t siz
 	s->refcount = -1;	/* Exempt from merging for now */
 }
 
+/* IAMROOT-12 fehead (2016-12-17):
+ * --------------------------
+ * name = NULL, size = {64, 128, 128, 256, 512, 1024, 2048, 4096, 8192}, flags
+ */
 struct kmem_cache *__init create_kmalloc_cache(const char *name, size_t size,
 				unsigned long flags)
 {
@@ -703,11 +753,38 @@ struct kmem_cache *__init create_kmalloc_cache(const char *name, size_t size,
 		panic("Out of memory when creating slab %s\n", name);
 
 	create_boot_cache(s, name, size, flags);
+
+/* IAMROOT-12:
+ * -------------
+ * 만들어진 slub 캐시를 전역 slab_caches 리스트에 추가한다.
+ */
 	list_add(&s->list, &slab_caches);
 	s->refcount = 1;
 	return s;
 }
 
+/* IAMROOT-12 fehead (2016-12-17):
+ * --------------------------
+ * pi2
+ * [0] = 0
+ * [1] = 0
+ * [2] = create_kmalloc_cache("kmalloc-192",192, flags);
+ * [3] = 0
+ * [4] = 0
+ * [5] = 0
+ * [6] = create_kmalloc_cache("kmalloc-64", 64, flags);
+ * [7] = create_kmalloc_cache("kmalloc-128", 128, flags);
+ * [8] = create_kmalloc_cache("kmalloc-256", 256, flags);
+ * [9] = create_kmalloc_cache("kmalloc-512", 512, flags);
+ * [10] = create_kmalloc_cache("kmalloc-1024", 1024, flags);
+ * [11] = create_kmalloc_cache("kmalloc-2048", 2048, flags);
+ * [12] = create_kmalloc_cache("kmalloc-4096", 4096, flags);
+ * [13] = create_kmalloc_cache("kmalloc-8192", 8192, flags);
+ */
+/* IAMROOT-12:
+ * -------------
+ * slub을 사용하는 경우 KMALLOC_SHIFT_HIGH(13)+1 이다.
+ */
 struct kmem_cache *kmalloc_caches[KMALLOC_SHIFT_HIGH + 1];
 EXPORT_SYMBOL(kmalloc_caches);
 
@@ -721,6 +798,21 @@ EXPORT_SYMBOL(kmalloc_dma_caches);
  * kmalloc array. This is necessary for slabs < 192 since we have non power
  * of two cache sizes there. The size of larger slabs can be determined using
  * fls.
+ */
+/* IAMROOT-12:
+ * -------------
+ * kmalloc에서 small slub object를 사용하는 경우 사용할 kmalloc 엔트리를 
+ * 선택하기 위한 인덱스 값을 찾는 테이블이다. (kmalloc_caches[])
+ *
+ * 3번부터는 2의 차수 단위 사이즈를 관리하는 kmalloc을 사용하게 하는데,
+ * 1번과 2번은 각각 96, 192 사이즈를 담당하도록 별도로 구성하였다.
+ */
+/* IAMROOT-12 fehead (2016-12-17):
+ * --------------------------
+ * pi2:
+ * size_index[0-7] = 6(KMALLOC_SHIFT_LOW) (64);
+ * size_index[8~11] = 7 (128)
+ * size_index[16-23] = 8 (256)
  */
 static s8 size_index[24] = {
 	3,	/* 8 */
@@ -806,7 +898,19 @@ void __init create_kmalloc_caches(unsigned long flags)
 	BUILD_BUG_ON(KMALLOC_MIN_SIZE > 256 ||
 		(KMALLOC_MIN_SIZE & (KMALLOC_MIN_SIZE - 1)));
 
+/* IAMROOT-12:
+ * -------------
+ * 캐시라인 미만의 바이트들은 해당 캐시라인과 동일한 사이즈로 유도한다.
+ *
+ * size_index[]의 하위 인덱스까지 KMALLOC_SHIFT_LOW(rpi2=6(D1-캐시라인=64)).
+ * rpi2) size_index[0~7] = KMALLOC_SHIFT_LOW(6) 
+ */
+	/* IAMROOT-12 fehead (2016-12-17):
+	 * --------------------------
+	 * size_index[0-7] = 6(64)
+	 */
 	for (i = 8; i < KMALLOC_MIN_SIZE; i += 8) {
+
 		int elem = size_index_elem(i);
 
 		if (elem >= ARRAY_SIZE(size_index))
@@ -814,25 +918,60 @@ void __init create_kmalloc_caches(unsigned long flags)
 		size_index[elem] = KMALLOC_SHIFT_LOW;
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * 캐시 정렬을 위해 64바이트 이상의 캐시라인을 사용하는 경우 72 ~ 96까지는 
+ * 캐시 정렬이 힘드므로 128로 유도한다.
+ *
+ * KMALLOC_MIN_SIZE(D1-캐시라인)가 64 이상인 경우 
+ * rpi2) size_index[8~11] = 7
+ */
+	/* IAMROOT-12 fehead (2016-12-17):
+	 * --------------------------
+	 * pi2 : KMALLOC_MIN_SIZE=64
+	 */
 	if (KMALLOC_MIN_SIZE >= 64) {
 		/*
 		 * The 96 byte size cache is not used if the alignment
 		 * is 64 byte.
+		 */
+		/* IAMROOT-12 fehead (2016-12-17):
+		 * --------------------------
+		 * size_index[8~11] = 7
 		 */
 		for (i = 64 + 8; i <= 96; i += 8)
 			size_index[size_index_elem(i)] = 7;
 
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * 캐시 정렬을 위해 128바이트 이상의 캐시라인을 사용하는 경우 136 ~ 192까지는 
+ * 캐시 정렬이 힘드므로 256으로 유도한다.
+ */
 	if (KMALLOC_MIN_SIZE >= 128) {
 		/*
 		 * The 192 byte sized cache is not used if the alignment
 		 * is 128 byte. Redirect kmalloc to use the 256 byte cache
 		 * instead.
 		 */
+		/* IAMROOT-12 fehead (2016-12-17):
+		 * --------------------------
+		 * size_index[16-23] = 8
+		 */
 		for (i = 128 + 8; i <= 192; i += 8)
 			size_index[size_index_elem(i)] = 8;
 	}
+
+/* IAMROOT-12:
+ * -------------
+ * kmalloc-# 을 준비한다. (rpi2: i=6 ~ 13)
+ * rpi2: kmalloc-64, 192, 256, 512, 1024, 2048, 4096, 8192
+ */
+	/* IAMROOT-12 fehead (2016-12-17):
+	 * --------------------------
+	 * i = 3 ; i < 13 ; i++
+	 */
 	for (i = KMALLOC_SHIFT_LOW; i <= KMALLOC_SHIFT_HIGH; i++) {
 		if (!kmalloc_caches[i]) {
 			kmalloc_caches[i] = create_kmalloc_cache(NULL,
@@ -844,16 +983,34 @@ void __init create_kmalloc_caches(unsigned long flags)
 		 * These have to be created immediately after the
 		 * earlier power of two caches
 		 */
+
+/* IAMROOT-12:
+ * -------------
+ * D-캐시라인이 32이하인 경우 kmalloc-96을 만들 수 있다.
+ */
 		if (KMALLOC_MIN_SIZE <= 32 && !kmalloc_caches[1] && i == 6)
 			kmalloc_caches[1] = create_kmalloc_cache(NULL, 96, flags);
 
+/* IAMROOT-12:
+ * -------------
+ * D-캐시라인이 64이하인 경우 kmalloc-192를 만들 수 있다.
+ */
 		if (KMALLOC_MIN_SIZE <= 64 && !kmalloc_caches[2] && i == 7)
 			kmalloc_caches[2] = create_kmalloc_cache(NULL, 192, flags);
 	}
 
 	/* Kmalloc array is now usable */
+
+/* IAMROOT-12:
+ * -------------
+ * kmalloc까지 준비가 된 상태이므로 slab(slub) 상태를 UP으로 바꾼다.
+ */
 	slab_state = UP;
 
+/* IAMROOT-12:
+ * -------------
+ * kmalloc-# 이름을 지정해준다.
+ */
 	for (i = 0; i <= KMALLOC_SHIFT_HIGH; i++) {
 		struct kmem_cache *s = kmalloc_caches[i];
 		char *n;
@@ -866,6 +1023,10 @@ void __init create_kmalloc_caches(unsigned long flags)
 		}
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * dma-kmalloc-# 이름을 지정해준다.
+ */
 #ifdef CONFIG_ZONE_DMA
 	for (i = 0; i <= KMALLOC_SHIFT_HIGH; i++) {
 		struct kmem_cache *s = kmalloc_caches[i];

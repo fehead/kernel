@@ -23,8 +23,16 @@
 #ifndef CONFIG_FORCE_MAX_ZONEORDER
 #define MAX_ORDER 11
 #else
+/* IAMROOT-12 fehead (2016-12-15):
+ * --------------------------
+ * pi2 = 11
+ */
 #define MAX_ORDER CONFIG_FORCE_MAX_ZONEORDER
 #endif
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * MAX_ORDER_NR_PAGES = 1024
+ */
 #define MAX_ORDER_NR_PAGES (1 << (MAX_ORDER - 1))
 
 /*
@@ -135,6 +143,11 @@ struct zone_padding {
 #define ZONE_PADDING(name)
 #endif
 
+/* IAMROOT-12:
+ * -------------
+ * NR_ALLOC_BATCH:
+ *      free page 수 (zone->managed_pages)
+ */
 enum zone_stat_item {
 	/* First 128 byte cacheline (assuming 64 bit words) */
 	NR_FREE_PAGES,
@@ -381,6 +394,10 @@ enum zone_type {
 	ZONE_HIGHMEM,
 #endif
 	ZONE_MOVABLE,
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * 라즈베리파이는 2, ZONE_NORMAL, ZONE_MOVABLE
+ */
 	__MAX_NR_ZONES
 };
 
@@ -400,6 +417,11 @@ struct zone {
 	 * on the higher zones). This array is recalculated at runtime if the
 	 * sysctl_lowmem_reserve_ratio sysctl changes.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * 응급 상황에서 커널이 사용할 수 있는 소량의 메모리를 확보하도록 준비해둔다.
+ */
 	long lowmem_reserve[MAX_NR_ZONES];
 
 #ifdef CONFIG_NUMA
@@ -424,6 +446,11 @@ struct zone {
 	 * This is a per-zone reserve of pages that should not be
 	 * considered dirtyable memory.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * dirty 페이지로 사용하지 못하게 제한을 건 페이지 수
+ */
 	unsigned long		dirty_balance_reserve;
 
 #ifndef CONFIG_SPARSEMEM
@@ -589,6 +616,14 @@ struct zone {
 	unsigned long percpu_drift_mark;
 
 #if defined CONFIG_COMPACTION || defined CONFIG_CMA
+/* IAMROOT-12:
+ * -------------
+ * compact_cached_free_pfn:
+ *      free 스캐너에 zone 끝 pfn으로 리셋 (아래로 증가)
+ * compact_cached_migrate_pfn[2]:
+ *      migrate 스캐너에 zone 시작 pfn으로 리셋 (위로 증가)
+ *      sync과 async 둘로 나뉘어 있다.
+ */
 	/* pfn where compaction free scanner should start */
 	unsigned long		compact_cached_free_pfn;
 	/* pfn where async and sync compaction migration scanner should start */
@@ -601,7 +636,20 @@ struct zone {
 	 * are skipped before trying again. The number attempted since
 	 * last failure is tracked with compact_considered.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * compaction 실패와 관련된 변수들
+ *
+ * compact_considered:      compaction 고려 횟수 (64개 이상인 경우 64개로 제한)
+ * compact_defer_shift:     compaction 유예 횟수 (6)
+ * compact_order_failed:    최근 compaction시 실패하였던 order 값을 보관
+ */
 	unsigned int		compact_considered;
+	/* IAMROOT-12 fehead (2016-11-12):
+	 * --------------------------
+	 * compact 유예 log2 수.(최대 COMPACT_MAX_DEFER_SHIFT 6, --> 2^6 = 64)
+	 */
 	unsigned int		compact_defer_shift;
 	int			compact_order_failed;
 #endif
@@ -670,6 +718,10 @@ static inline bool zone_is_empty(struct zone *zone)
 #define DEF_PRIORITY 12
 
 /* Maximum number of zones on a zonelist */
+/* IAMROOT-12 fehead (2016-12-29):
+ * --------------------------
+ * pi2: 2
+ */
 #define MAX_ZONES_PER_ZONELIST (MAX_NUMNODES * MAX_NR_ZONES)
 
 #ifdef CONFIG_NUMA
@@ -751,6 +803,11 @@ static inline bool zone_is_empty(struct zone *zone)
 
 
 struct zonelist_cache {
+
+/* IAMROOT-12:
+ * -------------
+ * z_to_n[]: zone x numa 노드 수 만큼으로 이루어져 zonelist의 zoneref[]에 대응한다.
+ */
 	unsigned short z_to_n[MAX_ZONES_PER_ZONELIST];		/* zone->nid */
 
 /* IAMROOT-12AB:
@@ -770,6 +827,10 @@ struct zonelist_cache {
 	unsigned long last_full_zap;		/* when last zap'd (jiffies) */
 };
 #else
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * 라즈베리파이2는 아래를 쓴다.
+ */
 #define MAX_ZONELISTS 1
 struct zonelist_cache;
 #endif
@@ -777,6 +838,11 @@ struct zonelist_cache;
 /*
  * This struct contains information about a zone in a zonelist. It is stored
  * here to avoid dereferences into large structures and lookups of tables
+ */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 이 구조체에는 zonelist의 영역(zone)에 대한 정보가 들어 있습니다. 큰 구조체의
+ * 역 참조와 테이블 조회를 피하기 위해 여기에 저장됩니다.
  */
 struct zoneref {
 
@@ -872,6 +938,7 @@ typedef struct pglist_data {
 /* IAMROOT-12AB:
  * -------------
  * SPARSEMEM이 아닌 모델에서 사용하는 노드별 mem_map(page descriptor들) 
+ * 라즈베리파이2
  */
 	struct page *node_mem_map;
 #ifdef CONFIG_PAGE_EXTENSION
@@ -1182,11 +1249,20 @@ struct zoneref *next_zones_zonelist(struct zoneref *z,
  * used to iterate the zonelist with next_zones_zonelist by advancing it by
  * one before calling.
  */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * 예) zonelist=contig_page_data.zonelist, nodemask = 0(ZONE_NORMAL),
+ *	high_zoneidx = 0(ZONE_NORMAL), zone=&ac.preferred_zone(0x0)
+ */
 static inline struct zoneref *first_zones_zonelist(struct zonelist *zonelist,
 					enum zone_type highest_zoneidx,
 					nodemask_t *nodes,
 					struct zone **zone)
 {
+/* IAMROOT-12:
+ * -------------
+ * zonelist에서 highest_zoneidx 이하의 zone과 요청 노드로 제한한 첫 zoneref를 반환한다.
+ */
 	struct zoneref *z = next_zones_zonelist(zonelist->_zonerefs,
 							highest_zoneidx, nodes);
 	*zone = zonelist_zone(z);
@@ -1203,6 +1279,25 @@ static inline struct zoneref *first_zones_zonelist(struct zonelist *zonelist,
  *
  * This iterator iterates though all zones at or below a given zone index and
  * within a given nodemask
+ */
+
+/* IAMROOT-12:
+ * -------------
+ * zlist(zonelist)에서 highidx 초과한 zone을 filter 하고, nodemask에 표현되지 않은
+ * 노드를 filter(nodemask=null인 경우는 모든 노드를 필터없이 사용)하여 iterator를 
+ * 제공한다. 각 interation마다 출력되는 항목은 zone 포인터, z(zoneref 포인터)
+ */
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * for_each_zone_zonelist_nodemask - 주어진 존 인덱스 또는 그 이하의 존리스트
+ *	내의 유효한 존을 반복하고 노드 마스크 내에서 반복하는 헬퍼 매크로
+ * @zone - 현재 zone iterator
+ * @z - zonelist-> zones 내의 현재 포인터 iterator
+ * @zlist - iterator 대상 zonelist
+ * @highidx - 반환 할 가장 높은 영역의 zone index
+ * @nodemask - 할당 자에 의해 허용 된 Nodemask
+ *
+ *이 반복자는 주어진 존 인덱스 또는 주어진 노드 마스크 이하의 모든 존을 반복합니다.
  */
 #define for_each_zone_zonelist_nodemask(zone, z, zlist, highidx, nodemask) \
 	for (z = first_zones_zonelist(zlist, highidx, nodemask, &zone);	\
@@ -1367,6 +1462,12 @@ struct mem_section {
  * 섹션 번호로 루트 번호를 산출한다.
  */
 #define SECTION_NR_TO_ROOT(sec)	((sec) / SECTIONS_PER_ROOT)
+
+/* IAMROOT-12:
+ * -------------
+ * SPARSEMEM_EXTREME: 1단계 엔트리 크기 - 전체 섹션 갯수 / 루트 섹션 갯수(2레벨 엔트리 갯수)
+ * SPARSEMEM_STATIC:  1(2)단계 엔트리 크기 - 전체 섹션 갯수와 동일
+ */
 #define NR_SECTION_ROOTS	DIV_ROUND_UP(NR_MEM_SECTIONS, SECTIONS_PER_ROOT)
 #define SECTION_ROOT_MASK	(SECTIONS_PER_ROOT - 1)
 

@@ -40,6 +40,10 @@ typedef struct cpumask { DECLARE_BITMAP(bits, NR_CPUS); } cpumask_t;
 #if NR_CPUS == 1
 #define nr_cpu_ids		1
 #else
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * nr_cpu_ids = 4
+ */
 extern int nr_cpu_ids;
 #endif
 
@@ -48,6 +52,10 @@ extern int nr_cpu_ids;
  * not all bits may be allocated. */
 #define nr_cpumask_bits	nr_cpu_ids
 #else
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * NR_CPUS = 4
+ */
 #define nr_cpumask_bits	NR_CPUS
 #endif
 
@@ -346,6 +354,10 @@ static inline void cpumask_setall(struct cpumask *dstp)
 /**
  * cpumask_clear - clear all cpus (< nr_cpu_ids) in a cpumask
  * @dstp: the cpumask pointer
+ */
+/* IAMROOT-12 fehead (2016-11-24):
+ * --------------------------
+ * init_mm.cpu_vm_mask_var = {{bits = {0x0}}}
  */
 static inline void cpumask_clear(struct cpumask *dstp)
 {

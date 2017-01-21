@@ -60,6 +60,14 @@ struct zoneref *next_zones_zonelist(struct zoneref *z,
 	 * Find the next suitable zone to use for the allocation.
 	 * Only filter based on nodemask if it's set
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * zonelist에서 highest_zoneidx 이하이면서 nodes(노드마스크)에 포함된 zonefer를 
+ * 찾아 반환한다. 단 현재 zoneref를 포함해서 검색한다.
+ *
+ * zonelist ------(filter: highest_zoneidx, nodes)-----> z(zoneref)
+ */
 	if (likely(nodes == NULL))
 		while (zonelist_zone_idx(z) > highest_zoneidx)
 			z++;
@@ -100,6 +108,11 @@ void lruvec_init(struct lruvec *lruvec)
 }
 
 #if defined(CONFIG_NUMA_BALANCING) && !defined(LAST_CPUPID_NOT_IN_PAGE_FLAGS)
+
+/* IAMROOT-12:
+ * -------------
+ * 인수로 받은 cpupid를 해당 페이지에 기록하되 기존 last_cpupid 값을 반환한다.
+ */
 int page_cpupid_xchg_last(struct page *page, int cpupid)
 {
 	unsigned long old_flags, flags;

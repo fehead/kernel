@@ -72,6 +72,10 @@ static inline void page_ext_init(void)
 struct page_ext *lookup_page_ext(struct page *page);
 
 #else /* !CONFIG_PAGE_EXTENSION */
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * pi2
+ */
 struct page_ext;
 
 static inline void pgdat_page_ext_init(struct pglist_data *pgdat)

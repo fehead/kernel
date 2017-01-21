@@ -122,6 +122,10 @@ static inline void set_cpu_numa_node(int cpu, int node)
 
 /* Returns the number of the current Node. */
 #ifndef numa_node_id
+/* IAMROOT-12 fehead (2016-11-25):
+ * --------------------------
+ * pi2
+ */
 static inline int numa_node_id(void)
 {
 	return cpu_to_node(raw_smp_processor_id());
@@ -151,6 +155,12 @@ static inline void set_numa_mem(int node)
 #ifndef node_to_mem_node
 static inline int node_to_mem_node(int node)
 {
+/* IAMROOT-12:
+ * -------------
+ * 0 -> 0, 1 -> 1, 2 -> 2, 3 -> 3    :   일반 NUMA 노드 (모든 노드에 memory가 있는 경우)
+ * 0 -> 0, 1 -> 0, 2 -> 2, 3 -> 2    :   1, 3번 노드가 memoryless 노드인 경우 
+ *                                       근접 노드를 찾아갈 수 있도록 배열을 사용한다.
+ */
 	return _node_numa_mem_[node];
 }
 #endif

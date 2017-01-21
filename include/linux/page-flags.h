@@ -109,6 +109,10 @@ enum pageflags {
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	PG_compound_lock,
 #endif
+/* IAMROOT-12 fehead (2016-10-16):
+ * --------------------------
+ * 라즈베리파이2는 22, 0x16
+ */
 	__NR_PAGEFLAGS,
 
 	/* Filesystems */
@@ -228,6 +232,11 @@ PAGEFLAG(Referenced, referenced) TESTCLEARFLAG(Referenced, referenced)
 	__SETPAGEFLAG(Referenced, referenced)
 PAGEFLAG(Dirty, dirty) TESTSCFLAG(Dirty, dirty) __CLEARPAGEFLAG(Dirty, dirty)
 PAGEFLAG(LRU, lru) __CLEARPAGEFLAG(LRU, lru)
+/* IAMROOT-12 fehead (2017-01-14):
+ * --------------------------
+ * PAGE Slab Flag enable 시 active는 비상용 slub으로 사용한다 라는 뜻.
+ *	보통 network swap을 쓸때 쓴다.
+ */
 PAGEFLAG(Active, active) __CLEARPAGEFLAG(Active, active)
 	TESTCLEARFLAG(Active, active)
 __PAGEFLAG(Slab, slab)
@@ -507,6 +516,12 @@ static inline int PageTransTail(struct page *page)
  */
 static inline int PageSlabPfmemalloc(struct page *page)
 {
+/* IAMROOT-12:
+ * -------------
+ * 비상용 slub 페이지 구분: PG_slab, PG_active 
+ * 비상용 slub -> pfmemalloc slub 페이지 -> 메모리 부족 시 
+ * Network Swap을 하기 위해 TCP object들이 사용되어야 하는 경우 사용
+ */
 	VM_BUG_ON_PAGE(!PageSlab(page), page);
 	return PageActive(page);
 }

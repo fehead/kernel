@@ -193,6 +193,10 @@ void get_online_mems(void);
 void put_online_mems(void);
 
 #else /* ! CONFIG_MEMORY_HOTPLUG */
+/* IAMROOT-12 fehead (2017-01-02):
+ * --------------------------
+ * pi2
+ */
 /*
  * Stub functions for when hotplug is off
  */

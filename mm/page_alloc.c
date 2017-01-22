@@ -6283,6 +6283,10 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
  * -------------
  * page_ext를 사용하는 경우 사용된다. (초기값은 null)
  */
+	/* IAMROOT-12 fehead (2017-01-05):
+	 * --------------------------
+	 * pi2: pgdat->node_page_ext = NULL;
+	 */
 	pgdat_page_ext_init(pgdat);
 
 	for (j = 0; j < MAX_NR_ZONES; j++) {
@@ -6300,6 +6304,10 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
  * realsize: 실제 메모리 페이지 수
  * freesize: realsize-메타데이터(memmap, dma_reserve)
  */
+		/* IAMROOT-12 fehead (2017-01-05):
+		 * --------------------------
+		 * size = zones_size[j]
+		 */
 		size = zone_spanned_pages_in_node(nid, j, node_start_pfn,
 						  node_end_pfn, zones_size);
 		realsize = freesize = size - zone_absent_pages_in_node(nid, j,

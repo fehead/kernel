@@ -91,6 +91,11 @@ struct kmem_cache {
 	struct kmem_cache_order_objects max;
 	struct kmem_cache_order_objects min;
 	gfp_t allocflags;	/* gfp flags to use on each alloc */
+	/* IAMROOT-12 fehead (2017-01-21):
+	 * --------------------------
+	 * refcount < 0  We may have set a slab to be unmergeable during bootstrap.
+	 * 만들어질때 1로 설정되며 0이되면 해제한다.
+	 */
 	int refcount;		/* Refcount for slab cache destroy */
 	void (*ctor)(void *);
 /* IAMROOT-12:

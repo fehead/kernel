@@ -38,6 +38,10 @@ struct vfree_deferred {
 	struct llist_head list;
 	struct work_struct wq;
 };
+/* IAMROOT-12 fehead (2017-02-04):
+ * --------------------------
+ * .wq.func = free_work
+ */
 static DEFINE_PER_CPU(struct vfree_deferred, vfree_deferred);
 
 static void __vunmap(const void *, int);
@@ -282,6 +286,11 @@ static unsigned long cached_hole_size;
 static unsigned long cached_vstart;
 static unsigned long cached_align;
 
+/* IAMROOT-12 fehead (2017-02-04):
+ * --------------------------
+ * vmalloc_init 함수에서
+ * vmap_area_pcpu_hole = VMALLOC_END;
+ */
 static unsigned long vmap_area_pcpu_hole;
 
 static struct vmap_area *__find_vmap_area(unsigned long addr)
@@ -303,6 +312,10 @@ static struct vmap_area *__find_vmap_area(unsigned long addr)
 	return NULL;
 }
 
+/* IAMROOT-12 fehead (2017-02-04):
+ * --------------------------
+ * vmap_area_root.rb_node에 va를 추가한다.
+ */
 static void __insert_vmap_area(struct vmap_area *va)
 {
 	struct rb_node **p = &vmap_area_root.rb_node;
@@ -749,6 +762,11 @@ static void free_unmap_vmap_area_addr(unsigned long addr)
 
 #define VMAP_BLOCK_SIZE		(VMAP_BBMAP_BITS * PAGE_SIZE)
 
+/* IAMROOT-12 fehead (2017-02-04):
+ * --------------------------
+ * vmalloc_init 함수에서
+ * vmap_initialized = true;
+ */
 static bool vmap_initialized __read_mostly = false;
 
 struct vmap_block_queue {
@@ -1200,9 +1218,19 @@ void __init vmalloc_init(void)
 		struct vmap_block_queue *vbq;
 		struct vfree_deferred *p;
 
+		/* IAMROOT-12 fehead (2017-02-04):
+		 * --------------------------
+		 * vmalloc.c
+		 * static DEFINE_PER_CPU(struct vmap_block_queue, vmap_block_queue);
+		 */
 		vbq = &per_cpu(vmap_block_queue, i);
 		spin_lock_init(&vbq->lock);
 		INIT_LIST_HEAD(&vbq->free);
+		/* IAMROOT-12 fehead (2017-02-04):
+		 * --------------------------
+		 * vmalloc.c
+		 * static DEFINE_PER_CPU(struct vfree_deferred, vfree_deferred);
+		 */
 		p = &per_cpu(vfree_deferred, i);
 		init_llist_head(&p->list);
 		INIT_WORK(&p->wq, free_work);
@@ -1322,6 +1350,16 @@ static void clear_vm_uninitialized_flag(struct vm_struct *vm)
 	vm->flags &= ~VM_UNINITIALIZED;
 }
 
+/* IAMROOT-12 fehead (2017-02-04):
+ * --------------------------
+ * __vmalloc_node_range 에서 호출
+ *	align	: 1
+ *	flags	: VM_ALLOC | VM_UNINITIALIZED | 0
+ *	start	: VMALLOC_START
+ *	end	: VMALLOC_END
+ *	gfp_mask: GFP_KERNEL | __GFP_HIGHMEM
+ *	node	: NUMA_NO_NODE
+ */
 static struct vm_struct *__get_vm_area_node(unsigned long size,
 		unsigned long align, unsigned long flags, unsigned long start,
 		unsigned long end, int node, gfp_t gfp_mask, const void *caller)
@@ -1645,6 +1683,17 @@ fail:
  *	allocator with @gfp_mask flags.  Map them into contiguous
  *	kernel virtual space, using a pagetable protection of @prot.
  */
+/* IAMROOT-12 fehead (2017-02-04):
+ * --------------------------
+ * __vmalloc_node 에서 호출
+ *	align	: 1
+ *	start	: VMALLOC_START
+ *	end	: VMALLOC_END
+ *	gfp_mask: GFP_KERNEL | __GFP_HIGHMEM
+ *	prot	: PAGE_KERNEL
+ *	vm_flags: 0
+ *	node	: NUMA_NO_NODE
+ */
 void *__vmalloc_node_range(unsigned long size, unsigned long align,
 			unsigned long start, unsigned long end, gfp_t gfp_mask,
 			pgprot_t prot, unsigned long vm_flags, int node,
@@ -1703,6 +1752,12 @@ fail:
  *	allocator with @gfp_mask flags.  Map them into contiguous
  *	kernel virtual space, using a pagetable protection of @prot.
  */
+/* IAMROOT-12 fehead (2017-02-04):
+ * --------------------------
+ * __vmalloc_node_flags 에서 호출
+ *   __vmalloc_node(size, 1, GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL,
+ *			NUMA_NO_NODE, __builtin_return_address(0));
+ */
 static void *__vmalloc_node(unsigned long size, unsigned long align,
 			    gfp_t gfp_mask, pgprot_t prot,
 			    int node, const void *caller)
@@ -1718,6 +1773,11 @@ void *__vmalloc(unsigned long size, gfp_t gfp_mask, pgprot_t prot)
 }
 EXPORT_SYMBOL(__vmalloc);
 
+/* IAMROOT-12 fehead (2017-02-04):
+ * --------------------------
+ * vmalloc에서 호출
+ *  __vmalloc_node_flags(size, NUMA_NO_NODE, GFP_KERNEL | __GFP_HIGHMEM);
+ */
 static inline void *__vmalloc_node_flags(unsigned long size,
 					int node, gfp_t flags)
 {

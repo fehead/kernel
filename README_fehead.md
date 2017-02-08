@@ -81,3 +81,35 @@
 		__free_pages
 	slab_free
 ```
+
+
+### 2017.02.04
+#### 문c 블로그
+- vmalloc
+- Red Black Tree Animation
+ - https://www.cs.usfca.edu/~galles/visualization/RedBlack.html
+
+#### 진도
+- mm_init
+```
+	percpu_init_late
+		pcpu_mem_zalloc
+	pgtable_init
+		ptlock_cache_init
+		pgtable_cache_init
+	vmalloc_init
+		__insert_vmap_area
+			rb_link_node
+			rb_insert_color
+
+```
+
+- vmalloc
+```
+	__vmalloc_node_flags
+		__vmalloc_node
+			__vmalloc_node_range
+				__get_vm_area_node
+				alloc_vmap_area
+				
+```

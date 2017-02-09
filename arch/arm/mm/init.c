@@ -727,6 +727,12 @@ static void __init free_highpages(void)
  * memory is free.  This is done after various parts of the system have
  * claimed their memory after the kernel image.
  */
+/* IAMROOT-12 fehead (2017-02-09):
+ * --------------------------
+ * mem_init()는 mem_map의 비어있는 영역을 표시하고 얼마만큼의 메모리가 비어 있는
+ * 지 알려줍니다. 이것은 시스템의 여러 부분이 커널 이미지 다음에 메모리를 요구
+ * 한 후에 수행됩니다.
+ */
 void __init mem_init(void)
 {
 #ifdef CONFIG_HAVE_TCM

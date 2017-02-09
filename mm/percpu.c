@@ -2938,6 +2938,12 @@ void __init setup_per_cpu_areas(void)
  * This function is called after slab is brought up and replaces those
  * with properly allocated maps.
  */
+/* IAMROOT-12 fehead (2017-02-09):
+ * --------------------------
+ * 첫 번째 및 예약 된 청크는 slab가 온라인이되기 전에 사용할 수 있도록 initdata
+ * 의 임시 할당 맵으로 초기화됩니다.
+ * 이 함수는 slab를 가져온 후 호출되어 올바르게 할당 된 맵으로 대체합니다.
+ */
 void __init percpu_init_late(void)
 {
 	struct pcpu_chunk *target_chunks[] =

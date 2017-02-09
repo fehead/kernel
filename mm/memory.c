@@ -77,6 +77,10 @@
 
 #ifndef CONFIG_NEED_MULTIPLE_NODES
 /* use the per-pgdat data instead for discontigmem - mbligh */
+/* IAMROOT-12 fehead (2017-02-09):
+ * --------------------------
+ * pi2 max_mapnr : 0x3c000 - mem_init 에서 설정.
+ */
 unsigned long max_mapnr;
 /* IAMROOT-12 fehead (2017-01-02):
  * --------------------------

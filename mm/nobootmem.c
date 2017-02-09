@@ -42,6 +42,13 @@ EXPORT_SYMBOL(contig_page_data);
  * max_low_pfn: highmem 시작 pfn 
  * max_pfn: DRAM 끝 pfn+1
  */
+/* IAMROOT-12 fehead (2017-02-09):
+ * --------------------------
+ * pi2
+ * max_low_pfn : 0x3c000
+ * min_low_pfn : 0x0
+ * max_pfn : 0x3c000
+ */
 unsigned long max_low_pfn;
 unsigned long min_low_pfn;
 unsigned long max_pfn;

@@ -384,6 +384,15 @@ static void purge_vmap_area_lazy(void);
  * Allocate a region of KVA of the specified size and alignment, within the
  * vstart and vend.
  */
+/* IAMROOT-12 fehead (2017-02-10):
+ * --------------------------
+ * __get_vm_area_node 에서 호출
+ *	align	: 1
+ *	start	: VMALLOC_START
+ *	end	: VMALLOC_END
+ *	node	: NUMA_NO_NODE
+ *	gfp_mask: GFP_KERNEL | __GFP_HIGHMEM
+ */
 static struct vmap_area *alloc_vmap_area(unsigned long size,
 				unsigned long align,
 				unsigned long vstart, unsigned long vend,
@@ -688,6 +697,17 @@ void set_iounmap_nonlazy(void)
  * Returns with *start = min(*start, lowest purged address)
  *              *end = max(*end, highest purged address)
  */
+/* IAMROOT-12 fehead (2017-02-10):
+ * --------------------------
+ * sync가 0이면 퍼지가 이미 진행중인 경우 제거하지 마십시오.
+ * force_flush가 1 인 경우, unmap (자신의 TLB 플러시를 최적화하기 위해 호출자가
+ * 사용할 수 있음)하지 않는 lazy vmap 영역이 없다고하더라도 *start와 *end 사이에
+ * 서 커널 TLB를 플러시합니다.
+ *
+ * purge_vmap_area_lazy에서 호출
+ *	*start = ULONG_MAX, *end = 0
+ *	sync = 1, force_flush = 0 
+ */
 static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
 					int sync, int force_flush)
 {
@@ -745,6 +765,11 @@ static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
  * Kick off a purge of the outstanding lazy areas. Don't bother if somebody
  * is already purging.
  */
+/* IAMROOT-12 fehead (2017-02-10):
+ * --------------------------
+ * 걸출한 게으른 지역을 제거하십시오. 이미 누군가가 퍼지(청소?)하고 있다면 신경
+ * 쓰지 마라.
+ */
 static void try_purge_vmap_area_lazy(void)
 {
 	unsigned long start = ULONG_MAX, end = 0;
@@ -754,6 +779,10 @@ static void try_purge_vmap_area_lazy(void)
 
 /*
  * Kick off a purge of the outstanding lazy areas.
+ */
+/* IAMROOT-12 fehead (2017-02-10):
+ * --------------------------
+ * 걸출한 게으른 지역을 제거하십시오.
  */
 static void purge_vmap_area_lazy(void)
 {
@@ -1471,8 +1500,8 @@ static void clear_vm_uninitialized_flag(struct vm_struct *vm)
  *	flags	: VM_ALLOC | VM_UNINITIALIZED | 0
  *	start	: VMALLOC_START
  *	end	: VMALLOC_END
- *	gfp_mask: GFP_KERNEL | __GFP_HIGHMEM
  *	node	: NUMA_NO_NODE
+ *	gfp_mask: GFP_KERNEL | __GFP_HIGHMEM
  */
 static struct vm_struct *__get_vm_area_node(unsigned long size,
 		unsigned long align, unsigned long flags, unsigned long start,
@@ -1501,6 +1530,11 @@ static struct vm_struct *__get_vm_area_node(unsigned long size,
 /* IAMROOT-12:
  * -------------
  * vm_struct 구조체를 할당 받아온다.
+ */
+/* IAMROOT-12 fehead (2017-02-10):
+ * --------------------------
+ * gfp_mask: GFP_KERNEL | __GFP_HIGHMEM 
+ * gfp_mask & GFP_RECLAIM_MASK = GFP_KERNEL
  */
 	area = kzalloc_node(sizeof(*area), gfp_mask & GFP_RECLAIM_MASK, node);
 	if (unlikely(!area))
@@ -1890,7 +1924,8 @@ fail:
 /* IAMROOT-12 fehead (2017-02-04):
  * --------------------------
  * __vmalloc_node_flags 에서 호출
- *   __vmalloc_node(size, 1, GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL,
+ *   __vmalloc_node(size, 1,
+ *			GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL,
  *			NUMA_NO_NODE, __builtin_return_address(0));
  */
 static void *__vmalloc_node(unsigned long size, unsigned long align,

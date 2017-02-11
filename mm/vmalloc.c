@@ -603,6 +603,12 @@ static void __free_vmap_area(struct vmap_area *va)
 	 * here too, consider only end addresses which fall inside
 	 * vmalloc area proper.
 	 */
+	/* IAMROOT-12 fehead (2017-02-11):
+	 * --------------------------
+	 * pcpu 영역 할당을 위해 가능한 가장 높은 후보를 추적하십시오. vmalloc
+	 * 영역 밖의 영역도 여기에 반환 할 수 있으며 vmalloc 영역 내부에있는
+	 * 최종 주소 만 고려하십시오.
+	 */
 	if (va->va_end > VMALLOC_START && va->va_end <= VMALLOC_END)
 		vmap_area_pcpu_hole = max(vmap_area_pcpu_hole, va->va_end);
 
@@ -664,6 +670,21 @@ static void vmap_debug_free_range(unsigned long start, unsigned long end)
  * code, and it will be simple to change the scale factor if we find that it
  * becomes a problem on bigger systems.
  */
+/* IAMROOT-12 fehead (2017-02-11):
+ * --------------------------
+ * lazy_max_pages는 TLB 플러시로 제거하기 전에 수집 한 가상 주소 공간의 최대
+ * 크기입니다.
+ *
+ * 더 많은 수의 커널 페이지 테이블을 다루고 제거하는 데 약간 더 오래 걸리지 만
+ * 수행해야하는 글로벌 TLB 플러시 수를 선형 적으로 줄입니다. 이 숫자를 CPU 수와
+ * 선형 적으로 조정하는 것이 자연스러운 것처럼 보일 수 있지만 (vmapping 활동이
+ * CPU 수에 따라 선형 적으로 확장 될 수 있기 때문에) 실제로는 vmap 활동이 의미
+ * 하는 다른 방식으로 작업 부하가 제한 될 수 있습니다. CPU에 따라 선형 적으로
+ * 확장되지 않습니다. 또한 나는 보수적으로 거대한 시스템에 큰 대기 시간을 도입
+ * 하지 않으려 고하므로 덜 공격적인 로그 규모로 가고 싶습니다. 이전 코드에 비해
+ * 여전히 개선 될 것이며 더 큰 시스템에서 문제가되는 경우 배율 인수를 변경하는
+ * 것이 간단 할 것입니다.
+ */
 static unsigned long lazy_max_pages(void)
 {
 	unsigned int log;
@@ -707,6 +728,11 @@ void set_iounmap_nonlazy(void)
  * purge_vmap_area_lazy에서 호출
  *	*start = ULONG_MAX, *end = 0
  *	sync = 1, force_flush = 0 
+ *
+ *
+ * try_purge_vmap_area_lazy 에서 호출
+ *	*start = ULONG_MAX, *end = 0
+ *	sync = 0, force_flush = 0 
  */
 static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
 					int sync, int force_flush)
@@ -1457,6 +1483,11 @@ void unmap_kernel_range(unsigned long addr, unsigned long size)
 }
 EXPORT_SYMBOL_GPL(unmap_kernel_range);
 
+/* IAMROOT-12 fehead (2017-02-11):
+ * --------------------------
+ * __vmalloc_area_node에서 호출
+ *	prot	: PAGE_KERNEL
+ */
 int map_vm_area(struct vm_struct *area, pgprot_t prot, struct page **pages)
 {
 	unsigned long addr = (unsigned long)area->addr;
@@ -1774,6 +1805,13 @@ EXPORT_SYMBOL(vmap);
 static void *__vmalloc_node(unsigned long size, unsigned long align,
 			    gfp_t gfp_mask, pgprot_t prot,
 			    int node, const void *caller);
+/* IAMROOT-12 fehead (2017-02-11):
+ * --------------------------
+ * __vmalloc_node_range 에서 호출
+ *	gfp_mask: GFP_KERNEL | __GFP_HIGHMEM
+ *	prot	: PAGE_KERNEL
+ *	node	: NUMA_NO_NODE
+ */
 static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 				 pgprot_t prot, int node)
 {

@@ -79,6 +79,10 @@
 #define PTE_EXT_APX		(_AT(pteval_t, 1) << 9)		/* v6 */
 #define PTE_EXT_COHERENT	(_AT(pteval_t, 1) << 9)		/* XScale3 */
 #define PTE_EXT_SHARED		(_AT(pteval_t, 1) << 10)	/* v6 */
+/* IAMROOT-12 fehead (2017-02-11):
+ * --------------------------
+ * Non Global
+ */
 #define PTE_EXT_NG		(_AT(pteval_t, 1) << 11)	/* v6 */
 
 /*

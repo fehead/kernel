@@ -141,8 +141,8 @@ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
  * PMD 테이블의 엔트리를 기록한다. (32bit ARM: 2개 한 쌍)
  *
  * ARM H/W PTE 테이블은 PTE 페이지에서 
- *    1) +2048 만큼 띄운다.
- *    2) +3072 만큼 띄운다.
+ *    1) +2048(+2k) 만큼 띄운다.
+ *    2) +3072(+3k) 만큼 띄운다.
  */
 	pmdval_t pmdval = (pte + PTE_HWTABLE_OFF) | prot;
 	pmdp[0] = __pmd(pmdval);

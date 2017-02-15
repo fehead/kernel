@@ -1775,6 +1775,14 @@ void __init arm_mm_memblock_reserve(void)
  * called function.  This means you can't use any function or debugging
  * method which may touch any device, otherwise the kernel _will_ crash.
  */
+/* IAMROOT-12 fehead (2017-02-15):
+ * --------------------------
+ * 장치 매핑을 설정하십시오. VMALLOC_START 위의 모든 매핑에 대한 페이지 테이블을
+ * 지우므로 모든 디버그 장치 매핑을 제거합니다. 즉,이 함수 또는 호출 된 함수를
+ * 디버깅하는 방법을주의해야합니다. 즉, 어떤 장치 나 장치에 접촉 할 수있는 함수
+ * 나 디버깅 방법을 사용할 수 없다는 것을 의미합니다. 그렇지 않으면 커널 _will_
+ * 이 충돌합니다.
+ */
 static void __init devicemaps_init(const struct machine_desc *mdesc)
 {
 	struct map_desc map;

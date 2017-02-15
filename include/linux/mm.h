@@ -1641,6 +1641,11 @@ static inline pte_t *get_locked_pte(struct mm_struct *mm, unsigned long addr,
 }
 
 #ifdef __PAGETABLE_PUD_FOLDED
+
+/* IAMROOT-12:
+ * -------------
+ * 32bit arm에서는 no pud이므로 항상 0을 반환한다.
+ */
 static inline int __pud_alloc(struct mm_struct *mm, pgd_t *pgd,
 						unsigned long address)
 {
@@ -1654,6 +1659,10 @@ int __pud_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address);
 static inline int __pmd_alloc(struct mm_struct *mm, pud_t *pud,
 						unsigned long address)
 {
+/* IAMROOT-12:
+ * -------------
+ * 32bit arm에서는 pmd fold 되어 있으므로 항상 0을 반환한다.
+ */
 	return 0;
 }
 
@@ -1702,12 +1711,20 @@ int __pte_alloc_kernel(pmd_t *pmd, unsigned long address);
 #if defined(CONFIG_MMU) && !defined(__ARCH_HAS_4LEVEL_HACK)
 static inline pud_t *pud_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
 {
+/* IAMROOT-12:
+ * -------------
+ * 32bit arm에서는 no pud이므로 pgd를 반환한다.
+ */
 	return (unlikely(pgd_none(*pgd)) && __pud_alloc(mm, pgd, address))?
 		NULL: pud_offset(pgd, address);
 }
 
 static inline pmd_t *pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long address)
 {
+/* IAMROOT-12:
+ * -------------
+ * 32bit arm에서는 pmd fold 되어 있으므로 pud를 반환한다.
+ */
 	return (unlikely(pud_none(*pud)) && __pmd_alloc(mm, pud, address))?
 		NULL: pmd_offset(pud, address);
 }
@@ -1787,7 +1804,20 @@ static inline void pte_lock_deinit(struct page *page) {}
 
 static inline void pgtable_init(void)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * spinlock이 아래와 같은 특정 조건에서 전용 kmem_cache를 사용한다.
+ *  - 공통 조건: 4 cpus 이상, spinlock_t 컴파일 시 4 바이트 초과
+ *  - arm 조건: mmu, vipt 캐시
+ */
 	ptlock_cache_init();
+
+/* IAMROOT-12:
+ * -------------
+ * 다른 아키텍처에서 사용한다.
+ * (x86, arm, amr64에서는 코드가 없다.)
+ */
 	pgtable_cache_init();
 }
 
@@ -1827,6 +1857,12 @@ static inline void pgtable_page_dtor(struct page *page)
 							pmd, address))?	\
 		NULL: pte_offset_map_lock(mm, pmd, address, ptlp))
 
+/* IAMROOT-12:
+ * -------------
+ * 이미 매핑된 경우 pte 테이블 주소를 알아오고,
+ * 매핑되지 않은 경우 pte 테이블을 할당하고 그 pte 테이블 주소를 반환한다.
+ * (할당 실패한 경우 null을 반환한다)
+ */
 #define pte_alloc_kernel(pmd, address)			\
 	((unlikely(pmd_none(*(pmd))) && __pte_alloc_kernel(pmd, address))? \
 		NULL: pte_offset_kernel(pmd, address))

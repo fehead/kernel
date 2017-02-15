@@ -70,7 +70,7 @@ static inline void clean_pte_table(pte_t *pte)
  * This actually allocates two hardware PTE tables, but we wrap this up
  * into one table thus:
  *
- *  +------------+
+ *  +------------+ <- low address
  *  | Linux pt 0 |
  *  +------------+
  *  | Linux pt 1 |
@@ -85,6 +85,11 @@ pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
 {
 	pte_t *pte;
 
+/* IAMROOT-12:
+ * -------------
+ * pte: 페이지 할당자로부터 1개 물리 페이지를 할당하고 그 가상 주소를 반환해온다.
+ *      (물리페이지는 lowmem 페이지)
+ */
 	pte = (pte_t *)__get_free_page(PGALLOC_GFP);
 	if (pte)
 		clean_pte_table(pte);
@@ -136,8 +141,8 @@ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
  * PMD 테이블의 엔트리를 기록한다. (32bit ARM: 2개 한 쌍)
  *
  * ARM H/W PTE 테이블은 PTE 페이지에서 
- *    1) +2048 만큼 띄운다.
- *    2) +3072 만큼 띄운다.
+ *    1) +2048(+2k) 만큼 띄운다.
+ *    2) +3072(+3k) 만큼 띄운다.
  */
 	pmdval_t pmdval = (pte + PTE_HWTABLE_OFF) | prot;
 	pmdp[0] = __pmd(pmdval);

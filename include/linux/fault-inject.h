@@ -64,6 +64,10 @@ static inline struct dentry *fault_create_debugfs_attr(const char *name,
 #ifdef CONFIG_FAILSLAB
 extern bool should_failslab(size_t size, gfp_t gfpflags, unsigned long flags);
 #else
+/* IAMROOT-12 fehead (2017-01-16):
+ * --------------------------
+ * pi2
+ */
 static inline bool should_failslab(size_t size, gfp_t gfpflags,
 				unsigned long flags)
 {

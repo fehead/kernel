@@ -63,6 +63,10 @@ static inline int tlb_ops_need_broadcast(void)
 	if (!is_smp())
 		return 0;
 
+/* IAMROOT-12 fehead (2017-02-11):
+ * --------------------------
+ * pi2: 0x02102211
+ */
 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 2;
 }
 #endif

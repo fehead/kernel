@@ -2964,10 +2964,10 @@ new_slab:
  * 해당 함수로 변환됩니다. 따라서 fastpath에서 만족 될 수있는 요청에 대한 함수
  * 호출 오버 헤드가 없습니다.
  *
- * fastpath는 먼저 잠금없는 여유 목록을 사용할 수 있는지 확인하여 작동합니다.
- * 그렇지 않으면 느린 처리를 위해 __slab_alloc이 호출됩니다.
+ * fastpath는 먼저 잠금없는 freelist을 사용할 수 있는지 확인하여 진행합니다.
+ * 그렇지 않으면 느린 처리를 위한 __slab_alloc을 호출됩니다.
  *
- * 그렇지 않으면 우리는 간단하게 lockless free리스트에서 다음 객체를 선택할 수
+ * 그렇지 않으면 우리는 간단하게 lockless freelist에서 다음 객체를 선택할 수
  * 있습니다.
  */
 static __always_inline void *slab_alloc_node(struct kmem_cache *s,

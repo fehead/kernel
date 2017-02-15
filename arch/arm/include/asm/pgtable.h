@@ -88,6 +88,18 @@ extern pgprot_t		pgprot_s2_device;
 
 #define _MOD_PROT(p, b)	__pgprot(pgprot_val(p) | (b))
 
+/* IAMROOT-12:
+ * -------------
+ * vmap 시 페이지 속성 
+ *  - PAGE_NONE:
+ *      NUMA 시스템에서 해당 페이지를 읽을 때 accesss 권한 실패로 인해 
+ *      abort exception이 발생되어 fault된 후 해당 페이지를 사용하는 
+ *      태스크의 migration을 고려하는 Automatic NUMA balancing을 위해 사용된다.
+ *  - PAGE_SHARED 
+ *      user 공유 데이터 페이지 
+ *  - PAGE_KERNEL 
+ *      kernel 데이터 페이지
+ */
 #define PAGE_NONE		_MOD_PROT(pgprot_user, L_PTE_XN | L_PTE_RDONLY | L_PTE_NONE)
 #define PAGE_SHARED		_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_XN)
 #define PAGE_SHARED_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER)
@@ -199,6 +211,10 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
  */
 #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
 
+/* IAMROOT-12:
+ * -------------
+ * 엔트리 값이 0으로 매핑되지 않은 경우 true(1) 반환
+ */
 #define pmd_none(pmd)		(!pmd_val(pmd))
 #define pmd_present(pmd)	(pmd_val(pmd))
 
@@ -235,6 +251,10 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 #define pte_page(pte)		pfn_to_page(pte_pfn(pte))
 #define mk_pte(page,prot)	pfn_pte(page_to_pfn(page), prot)
 
+/* IAMROOT-12:
+ * -------------
+ * pte 엔트리 값으로 0을 저장하면 언매핑된다.
+ */
 #define pte_clear(mm,addr,ptep)	set_pte_ext(ptep, __pte(0), 0)
 
 #define pte_isset(pte, val)	((u32)(val) == (val) ? pte_val(pte) & (val) \
@@ -250,6 +270,10 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 #define pte_young(pte)		(pte_isset((pte), L_PTE_YOUNG))
 #define pte_exec(pte)		(pte_isclear((pte), L_PTE_XN))
 
+/* IAMROOT-12:
+ * -------------
+ * L_PTE_USER, L_PTE_YOUNG이 설정되어 있는 경우 true
+ */
 #define pte_valid_user(pte)	\
 	(pte_valid(pte) && pte_isset((pte), L_PTE_USER) && pte_young(pte))
 
@@ -264,11 +288,32 @@ extern void __sync_icache_dcache(pte_t pteval);
 static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
 			      pte_t *ptep, pte_t pteval)
 {
+/* IAMROOT-12:
+ * -------------
+ * addr: 매핑할 가상 주소 
+ * ptep: pte 엔트리를 가리키는 포인터(가상 주소)
+ * pteval: 기록할 값(pa + 속성)
+ */
 	unsigned long ext = 0;
 
+/* IAMROOT-12:
+ * -------------
+ * 유저 공간에 매핑하는 경우
+ */
 	if (addr < TASK_SIZE && pte_valid_user(pteval)) {
+
+/* IAMROOT-12:
+ * -------------
+ * arm의 경우 항상 icache_dcache 싱크(flush)를 수행하는데
+ * rpi2의 경우 pte가 데이터 페이지인 경우 flush하지 않는다.
+ */
 		if (!pte_special(pteval))
 			__sync_icache_dcache(pteval);
+
+/* IAMROOT-12:
+ * -------------
+ * 유저 페이지이므로 non global을 arm h/w 속성에 추가한다.
+ */
 		ext |= PTE_EXT_NG;
 	}
 

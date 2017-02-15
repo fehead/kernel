@@ -77,6 +77,10 @@
 
 #ifndef CONFIG_NEED_MULTIPLE_NODES
 /* use the per-pgdat data instead for discontigmem - mbligh */
+/* IAMROOT-12 fehead (2017-02-09):
+ * --------------------------
+ * pi2 max_mapnr : 0x3c000 - mem_init 에서 설정.
+ */
 unsigned long max_mapnr;
 /* IAMROOT-12 fehead (2017-01-02):
  * --------------------------
@@ -606,13 +610,28 @@ int __pte_alloc(struct mm_struct *mm, struct vm_area_struct *vma,
 
 int __pte_alloc_kernel(pmd_t *pmd, unsigned long address)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * 커널용(lowmem) 물리 페이지 1개 페이지를 할당받고 그 가상 주소를 알아온다.
+ *	- highmem 페이지를 사용하지 않는다.
+ */
 	pte_t *new = pte_alloc_one_kernel(&init_mm, address);
 	if (!new)
 		return -ENOMEM;
 
 	smp_wmb(); /* See comment in __pte_alloc */
 
+/* IAMROOT-12:
+ * -------------
+ * 페이지 테이블 엔트리를 조작하기 위해 page table 락을 건다
+ */
 	spin_lock(&init_mm.page_table_lock);
+
+/* IAMROOT-12:
+ * -------------
+ * lock을 걸기 전에 다시 한 번 매핑 확인을 한다.
+ */
 	if (likely(pmd_none(*pmd))) {	/* Has another populated it ? */
 		pmd_populate_kernel(&init_mm, pmd, new);
 		new = NULL;
@@ -3750,6 +3769,16 @@ static struct kmem_cache *page_ptl_cachep;
 
 void __init ptlock_cache_init(void)
 {
+/* IAMROOT-12:
+ * -------------
+ * spinlock debug 기능을 사용하는 경우 spinlock 사이즈가 커지게 되고 
+ * 이러한 경우 kmalloc으로 할당받아 사용시 메모리 낭비가 발생할 수 
+ * 있는 경우에 별도의 kmem_cache를 생성하게 한다.
+ * (x86 아키텍처에서 debug 기능을 사용하는 spinlock이 72바이트를 
+ *  사용하게 되는데 kmalloc-96으로 할당받아오면 24바이트가 낭비되는 
+ *  결과가 있고 이를 아주 많이 사용하면 메모리 소모가 커진다.
+ *  이러한 경우를 위해 전용 사이즈의 캐시를 만들어 사용한다.)
+ */
 	page_ptl_cachep = kmem_cache_create("page->ptl", sizeof(spinlock_t), 0,
 			SLAB_PANIC, NULL);
 }

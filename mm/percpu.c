@@ -420,6 +420,10 @@ static void *pcpu_mem_zalloc(size_t size)
 	if (WARN_ON_ONCE(!slab_is_available()))
 		return NULL;
 
+/* IAMROOT-12:
+ * -------------
+ * 0으로 초기화된 size만큼의 object를 할당받아온다.
+ */
 	if (size <= PAGE_SIZE)
 		return kzalloc(size, GFP_KERNEL);
 	else
@@ -2934,6 +2938,12 @@ void __init setup_per_cpu_areas(void)
  * This function is called after slab is brought up and replaces those
  * with properly allocated maps.
  */
+/* IAMROOT-12 fehead (2017-02-09):
+ * --------------------------
+ * 첫 번째 및 예약 된 청크는 slab가 온라인이되기 전에 사용할 수 있도록 initdata
+ * 의 임시 할당 맵으로 초기화됩니다.
+ * 이 함수는 slab를 가져온 후 호출되어 올바르게 할당 된 맵으로 대체합니다.
+ */
 void __init percpu_init_late(void)
 {
 	struct pcpu_chunk *target_chunks[] =
@@ -2942,6 +2952,11 @@ void __init percpu_init_late(void)
 	unsigned long flags;
 	int i;
 
+/* IAMROOT-12:
+ * -------------
+ * 기존에 static array로 할당받은 map을 새로운 slub object를 할당받은 후
+ * 복사하여 사용한다.
+ */
 	for (i = 0; (chunk = target_chunks[i]); i++) {
 		int *map;
 		const size_t size = PERCPU_DYNAMIC_EARLY_SLOTS * sizeof(map[0]);

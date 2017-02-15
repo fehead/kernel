@@ -590,6 +590,10 @@ static inline void memcg_put_cache_ids(void)
 {
 }
 
+/* IAMROOT-12 fehead (2017-01-16):
+ * --------------------------
+ * pi2:
+ */
 static inline struct kmem_cache *
 memcg_kmem_get_cache(struct kmem_cache *cachep, gfp_t gfp)
 {

@@ -182,3 +182,21 @@
 								flush_tlb_kernel_range
 							
   ```
+
+### 2017.02.18
+
+#### 진도
+- __vectors_start
+```
+	vector_rst
+	vector_und
+	__stubs_start
+		vector_swi (arch/arm/kernel/entry-common.S)
+			
+```
+
+- vector_pabt
+```
+	vector_stub
+	usr_entry
+```

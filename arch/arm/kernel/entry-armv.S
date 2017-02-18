@@ -1055,6 +1055,11 @@ __kuser_helper_end:
  * correction:
  *	- 핸들러 처리 후 복귀할 주소 교정(0, 4, 8)
  */
+/* IAMROOT-12 fehead (2017-02-18):
+ * --------------------------
+ * vector_pabt	vector_stub pabt, ABT_MODE, 4
+ * cpu_init 에서 각 모드 sp를 설정(stacks)하는 소스가 있다.
+ */
 	.macro	vector_stub, name, mode, correction=0
 	.align	5
 

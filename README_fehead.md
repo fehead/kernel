@@ -181,7 +181,7 @@
 								__free_vmap_area
 								flush_tlb_kernel_range
 							
-  ```
+```
 
 ### 2017.02.18
 
@@ -200,3 +200,19 @@
 	vector_stub
 	usr_entry
 ```
+
+### 2017.02.25
+
+#### 진도
+- vector
+```
+	usr_entry
+
+```
+- do_PrefetchAbort
+```
+	arm_notify_die
+		die
+```
+- get_thread_info
+- ret_to_user

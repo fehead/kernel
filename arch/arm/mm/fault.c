@@ -574,6 +574,12 @@ hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *
 	ifsr_info[nr].name = name;
 }
 
+/* IAMROOT-12 fehead (2017-02-25):
+ * --------------------------
+ * addr : Instruction Fault Address Register
+ * ifsr : Instruction Fault Status Register
+ * regs : fault register set.
+ */
 asmlinkage void __exception
 do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
 {

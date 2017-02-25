@@ -55,6 +55,10 @@
 	mov	lr, pc
 	ldr	pc, [ip, #PROCESSOR_PABT_FUNC]
 #else
+/* IAMROOT-12 fehead (2017-02-25):
+ * --------------------------
+ * #define CPU_PABORT_HANDLER v7_pabort
+ */
 	bl	CPU_PABORT_HANDLER
 #endif
 	.endm
@@ -316,6 +320,10 @@ ENDPROC(__fiq_svc)
 	.word	cr_alignment
 #ifdef MULTI_DABORT
 .LCprocfns:
+/* IAMROOT-12 fehead (2017-02-25):
+ * --------------------------
+ * kernel/setup.c processor
+ */
 	.word	processor
 #endif
 .LCfp:

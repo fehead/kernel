@@ -1114,6 +1114,7 @@ __kuser_helper_end:
 /* IAMROOT-12 fehead (2017-02-18):
  * --------------------------
  * vector_pabt	vector_stub pabt, ABT_MODE, 4
+ * vector_und	vector_stub und, UND_MODE
  * cpu_init 에서 각 모드 sp를 설정(stacks)하는 소스가 있다.
  */
 	.macro	vector_stub, name, mode, correction=0

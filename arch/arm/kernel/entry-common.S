@@ -82,6 +82,10 @@ ENTRY(ret_to_user_from_irq)
  *
  * curr->flags에 TIF_WORK_MASK플래그가 있는 경우 work_pending으로 이동
  */
+/* IAMROOT-12 fehead (2017-02-27):
+ * --------------------------
+ * DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
+ */
 	ldr	r1, [tsk, #TI_FLAGS]
 	tst	r1, #_TIF_WORK_MASK
 	bne	work_pending
@@ -103,6 +107,7 @@ no_work_pending:
 /* IAMROOT-12:
  * -------------
  * CONFIG_CONTEXT_TRACKING 커널 옵션을 사용하는 경우 사용된다.
+ * rpi2는 아래 코드가 blank이다.
  */
 	ct_user_enter save = 0
 

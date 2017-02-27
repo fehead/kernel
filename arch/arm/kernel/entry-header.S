@@ -258,6 +258,11 @@
  */
 	.macro	restore_user_regs, fast = 0, offset = 0
 	mov	r2, sp
+/* IAMROOT-12 fehead (2017-02-27):
+ * --------------------------
+ * DEFINE(S_PSR, offsetof(struct pt_regs, uregs[16]));
+ * DEFINE(S_PC, offsetof(struct pt_regs, uregs[15]));
+ */
 	ldr	r1, [r2, #\offset + S_PSR]	@ get calling cpsr
 	ldr	lr, [r2, #\offset + S_PC]!	@ get pc
 
@@ -298,9 +303,10 @@
 	mov	r0, r0				@ ARMv5T and earlier require a nop
 						@ after ldm {}^
 
-/* IAMROOT-12:
- * -------------
- * 
+/* IAMROOT-12 fehead (2017-02-27):
+ * --------------------------
+ * usermode pc(lr)를 pc에 복구하여 usermode로 변경한다.
+ *	pabt 모드의 경우 최초 vector_pabt 발생되기 이전 사용자 모드.
  */
 	add	sp, sp, #\offset + S_FRAME_SIZE
 	movs	pc, lr				@ return & move spsr_svc into cpsr

@@ -410,6 +410,11 @@ ENDPROC(__fiq_abt)
  * -------------
  * stack을 pt_regs 구조체 사이즈 만큼 증가시키고 r1~r12를 백업한다.
  */
+/* IAMROOT-12 fehead (2017-02-27):
+ * --------------------------
+ * S_FRAME_SIZE = sizeof(struct pt_regs) = 72 = 18 * 4
+ *	r0 ~ r15, cpsr, ori_r0
+ */
 	sub	sp, sp, #S_FRAME_SIZE
  ARM(	stmib	sp, {r1 - r12}	)
  THUMB(	stmia	sp, {r0 - r12}	)
@@ -834,9 +839,12 @@ ENTRY(ret_from_exception)
 
 /* IAMROOT-12:
  * -------------
- * arch/arm/include/asm/assembler.h
- * tsk: r9
- * why: r8
+ * arch/arm/kernel/entry-head.S
+ * 
+ * scno	.req	r7		@ syscall number
+ * tbl	.req	r8		@ syscall table pointer
+ * why	.req	r8		@ Linux syscall (!= 0)
+ * tsk	.req	r9		@ current thread_info
  */
 	get_thread_info tsk
 	mov	why, #0
@@ -1246,6 +1254,11 @@ vector_\name:
  THUMB(	ldr	lr, [r0, lr, lsl #2]	)
 	mov	r0, sp
  ARM(	ldr	lr, [pc, lr, lsl #2]	)
+
+/* IAMROOT-12 fehead (2017-02-27):
+ * --------------------------
+ * pabt 예의 경우 __pabt_usr(ABT의 스택) 호출.
+ */
 	movs	pc, lr			@ branch to handler in SVC mode
 ENDPROC(vector_\name)
 

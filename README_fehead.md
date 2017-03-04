@@ -225,4 +225,17 @@
 				restore_user_regs
 ```
 		
+### 2017.03.04
 
+#### 진도
+- start_kernel -> time_init -> of_clk_init
+```
+	CLK_OF_DECLARE
+		OF_DECLARE_1
+			_OF_DECLARE
+	for_each_matching_node_and_match
+	parent_ready
+		__of_clk_get
+			of_parse_phandle_with_args
+
+```

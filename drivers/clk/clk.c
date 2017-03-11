@@ -2235,6 +2235,11 @@ static int __clk_init(struct device *dev, struct clk *clk_user)
 	}
 
 	/* check that clk_ops are sane.  See Documentation/clk.txt */
+
+	/* IAMROOT-12 fehead (2017-03-11):
+	 * --------------------------
+	 * http://jake.dothome.co.kr/clk-1/ ops 콜백 함수 도표 참고
+	 */
 	if (clk->ops->set_rate &&
 	    !((clk->ops->round_rate || clk->ops->determine_rate) &&
 	      clk->ops->recalc_rate)) {
@@ -2390,6 +2395,10 @@ out:
 	return ret;
 }
 
+/* IAMROOT-12 fehead (2017-03-11):
+ * --------------------------
+ * hw->clk = __clk_create_clk(hw, NULL, NULL);
+ */
 struct clk *__clk_create_clk(struct clk_hw *hw, const char *dev_id,
 			     const char *con_id)
 {
@@ -2434,6 +2443,10 @@ void __clk_free_clk(struct clk *clk)
  * cannot be dereferenced by driver code but may be used in conjuction with the
  * rest of the clock API.  In the event of an error clk_register will return an
  * error code; drivers must test for an error code after calling clk_register.
+ */
+/* IAMROOT-12 fehead (2017-03-11):
+ * --------------------------
+ * dev = NULL, hw = ...
  */
 struct clk *clk_register(struct device *dev, struct clk_hw *hw)
 {

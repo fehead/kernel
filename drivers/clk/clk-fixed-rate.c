@@ -56,6 +56,13 @@ EXPORT_SYMBOL_GPL(clk_fixed_rate_ops);
  * @fixed_rate: non-adjustable clock rate
  * @fixed_accuracy: non-adjustable clock rate
  */
+/* IAMROOT-12 fehead (2017-03-11):
+ * --------------------------
+ * clk = clk_register_fixed_rate_with_accuracy(NULL, clk_name, NULL,
+ * 					    CLK_IS_ROOT, rate,
+ * 					    accuracy);
+ * dev = NULL, name="mmc" or "core" or ..., parent_name = NULL, 
+ */
 struct clk *clk_register_fixed_rate_with_accuracy(struct device *dev,
 		const char *name, const char *parent_name, unsigned long flags,
 		unsigned long fixed_rate, unsigned long fixed_accuracy)
@@ -119,6 +126,18 @@ void of_fixed_clk_setup(struct device_node *node)
 	u32 rate;
 	u32 accuracy = 0;
 
+/* IAMROOT-12 fehead (2017-03-11):
+ * --------------------------
+ * clock@0 {
+ *	compatible = "fixed-clock";
+ *	reg = <0x0>;
+ *	#clock-cells = <0x0>;
+ *	clock-output-names = "mmc";
+ *	clock-frequency = <0xee6b280>;
+ *	linux,phandle = <0xb>;
+ *	phandle = <0xb>;
+};
+ */
 	if (of_property_read_u32(node, "clock-frequency", &rate))
 		return;
 

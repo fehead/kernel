@@ -239,3 +239,27 @@
 			of_parse_phandle_with_args
 
 ```
+
+### 2017.03.11
+
+#### 문C 블로그
+- clk-1
+
+#### 진도
+- of_fixed_clk_setup
+```
+	clk_register_fixed_rate_with_accuracy
+		clk_register
+			__clk_create_clk
+			__clk_init
+				clk_core_lookup
+					__clk_lookup_subtree
+				__clk_init_parent
+					clk_core_get_parent_by_index
+				clk_core_reparent
+					clk_reparent
+					__clk_recalc_accuracies
+					__clk_recalc_rates
+						__clk_notify
+
+```

@@ -203,6 +203,10 @@ ENDPROC(__und_invalid)
  * 대해 에뮬레이션하며 최대 16개의 레지스터 백업 공간을 확보하게 한다.
  */
 	sub	sp, sp, #(S_FRAME_SIZE + \stack_hole - 4)
+/* IAMROOT-12 fehead (2017-03-08):
+ * --------------------------
+ * pi2 CONFIG_THUMB2_KERNEL is not set
+ */
 #ifdef CONFIG_THUMB2_KERNEL
  SPFIX(	str	r0, [sp]	)	@ temporarily saved
  SPFIX(	mov	r0, sp		)
@@ -1219,6 +1223,7 @@ __kuser_helper_end:
  * --------------------------
  * vector_pabt	vector_stub pabt, ABT_MODE, 4
  * vector_und	vector_stub und, UND_MODE
+ * vector_irq	vector_stub irq, IRQ_MODE, 4
  * cpu_init 에서 각 모드 sp를 설정(stacks)하는 소스가 있다.
  */
 	.macro	vector_stub, name, mode, correction=0
@@ -1352,6 +1357,10 @@ vector_rst:
 /* IAMROOT-12AB:
  * -------------
  * IRQ 디스패처
+ */
+/* IAMROOT-12 fehead (2017-03-08):
+ * --------------------------
+ * vector_irq
  */
 	vector_stub	irq, IRQ_MODE, 4
 

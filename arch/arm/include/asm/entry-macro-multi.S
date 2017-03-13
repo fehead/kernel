@@ -9,6 +9,11 @@
  * -------------
  * arch/arm/mach-bcm2709//include/mach/entry-macro.S
  */
+/* IAMROOT-12 fehead (2017-03-08):
+ * --------------------------
+ * get_irqnr_preamble -> r6에 ARM 인터럽트 컨트롤러 주소를 가져옴.
+ * get_irqnr_and_base, irqnr, irqstat, base, tmp
+ */
 	get_irqnr_preamble r6, lr
 1:	get_irqnr_and_base r0, r2, r6, lr
 	movne	r1, sp

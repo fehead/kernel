@@ -148,18 +148,18 @@
 ```
 
  - vmap
- ```
+```
 	get_vm_area_caller
 	map_vm_area
- ```
+```
 
-  - vfree
-  ```
+ - vfree
+```
 	__vunmap(addr, 1)
-  ```
+```
 
-  - vunmap
-  ```
+ - vunmap
+```
 	__vunmap(addr, 0)
 		remove_vm_area
 			find_vmap_area

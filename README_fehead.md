@@ -263,3 +263,19 @@
 						__clk_notify
 
 ```
+
+### 2017.03.11
+#### 
+- http://jake.dothome.co.kr/clk-1/
+- http://jake.dothome.co.kr/clk-2/
+
+#### 진도
+- of_fixed_factor_clk_setup
+```
+	of_clk_get_parent_name
+		of_parse_phandle_with_args
+	clk_register_fixed_factor
+		clk_register
+
+
+```

@@ -39,8 +39,8 @@
 ```
 
 ### 2017.01.21
-#### 문c 블로그
-- slub-cache-create
+#### 참고
+- http://jake.dothome.co.kr/slub-cache-create
 
 #### 진도
 - kmem_cache_create
@@ -84,8 +84,8 @@
 
 
 ### 2017.02.04
-#### 문c 블로그
-- vmalloc
+#### 참고
+- http://jake.dothome.co.kr/vmalloc
 - Red Black Tree Animation
  - https://www.cs.usfca.edu/~galles/visualization/RedBlack.html
 
@@ -115,8 +115,8 @@
 ```
 
 ### 2017.02.11
-#### 문c 블로그
-- vmalloc
+#### 참고
+- http://jake.dothome.co.kr/vmalloc
 
 #### 진도
 - vmalloc
@@ -242,8 +242,8 @@
 
 ### 2017.03.11
 
-#### 문C 블로그
-- clk-1
+#### 참고
+- http://jake.dothome.co.kr/clk-1
 
 #### 진도
 - of_fixed_clk_setup
@@ -265,7 +265,7 @@
 ```
 
 ### 2017.03.11
-#### 
+#### 참고
 - http://jake.dothome.co.kr/clk-1/
 - http://jake.dothome.co.kr/clk-2/
 

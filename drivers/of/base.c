@@ -1443,6 +1443,14 @@ void of_print_phandle_args(const char *msg, const struct of_phandle_args *args)
 	printk("\n");
 }
 
+/* IAMROOT-12 fehead (2017-03-18):
+ * --------------------------
+ * list_name = "clocks"
+ * cells_name = "#clock-cells"
+ * cell_count = 0
+ * index = index
+ * out_args = &clkspec);
+ */
 static int __of_parse_phandle_with_args(const struct device_node *np,
 					const char *list_name,
 					const char *cells_name,

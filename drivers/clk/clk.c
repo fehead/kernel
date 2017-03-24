@@ -3292,6 +3292,13 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
  * 예) index=0
  *     clkspec = {np=&c0, args_count=1, args[]={40}}
  */
+	/* IAMROOT-12 fehead (2017-03-18):
+	 * --------------------------
+	 * clkspec.np = 부모노드
+	 * clkspec.args_count = 부모노드 #clock-cells count
+	 * clkspec.args = 현재노드의 args[] 값들.
+	 * 를 반환한다.
+	 */
 	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
 					&clkspec);
 	if (rc)

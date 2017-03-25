@@ -279,3 +279,29 @@
 
 
 ```
+
+### 2017.03.18
+#### 참고
+- http://jake.dothome.co.kr/clk-1/
+
+#### 진도
+- of_clk_set_defaults
+```
+	__set_clk_parents
+	__set_clk_rates
+		clk_set_rate
+			clk_core_set_rate_nolock
+				clk_calc_new_rates
+					clk_core_get_boundaries
+					clk_fetch_parent_index
+					clk_calc_subtree
+				clk_propagate_rate_change
+				clk_change_rate
+					__clk_set_parent_before
+					__clk_set_parent_after
+					clk_change_rate
+```
+
+- clk_notifier_register
+```
+```

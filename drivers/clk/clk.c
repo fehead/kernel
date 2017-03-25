@@ -1018,6 +1018,19 @@ static int clk_core_prepare(struct clk_core *clk)
  * exclusive.  In fact clk_prepare must be called before clk_enable.
  * Returns 0 on success, -EERROR otherwise.
  */
+/* IAMROOT-12 fehead (2017-03-25):
+ * --------------------------
+ * clk_prepare - 클럭 소스 준비
+ * @clk : 준비중인 clk
+ *
+ * clk_prepare가 잠자기 상태가되어 clk_enable과 구별됩니다. clk_enable 대신에
+ * clk_prepare를 사용하여 clk를 해제 할 수 있습니다. 하나의 예가 I2C를 통해
+ * 액세스되는 clk입니다. 복잡한 경우 clk ungate 작업에는 빠르고 느린 부분이
+ * 필요할 수 있습니다. clk_prepare와 clk_enable은 상호 배타적이지 않습니다.
+ * 사실 clk_prepare는 clk_enable 전에 호출되어야합니다.
+ *
+ * 성공하면 0을, 그렇지 않으면 -EERROR를 리턴합니다.
+ */
 int clk_prepare(struct clk *clk)
 {
 	int ret;
@@ -1228,6 +1241,15 @@ EXPORT_SYMBOL_GPL(__clk_round_rate);
  * use which is then returned.  If clk doesn't support round_rate operation
  * then the parent rate is returned.
  */
+/* IAMROOT-12 fehead (2017-03-25):
+ * --------------------------
+ * clk_round_rate - clk에 주어진 속도를 반올림합니다.
+ * @clk : 속도를 반올림하는 clk
+ * @rate : 반올림되는 비율
+ *
+ * 입력으로 비율을 가져 와서 clk가 실제로 사용할 수있는 비율로 반올림 한 다음
+ * 반환됩니다. clk가 round_rate 연산을 지원하지 않으면 부모 속도가 반환됩니다.
+ */
 long clk_round_rate(struct clk *clk, unsigned long rate)
 {
 	unsigned long ret;
@@ -1256,6 +1278,20 @@ EXPORT_SYMBOL_GPL(clk_round_rate);
  * internal clock code only.  Returns NOTIFY_DONE from the last driver
  * called if all went well, or NOTIFY_STOP or NOTIFY_BAD immediately if
  * a driver returns that.
+ */
+/* IAMROOT-12 fehead (2017-03-25):
+ * --------------------------
+ * __clk_notify - clk 알 고리 체인 호출
+ * @ clk : 속도를 변경하는 구조 clk *
+ * @msg : clk 통지기 유형 (include/linux/clk.h 참조)
+ * @old_rate : 오래된 clk rate
+ * @new_rate : 새로운 clk rate
+ *
+ * 'clk'에 대한 clk rate-change 알림에서 알 림자 호출 체인을 트리거합니다.
+ * 구조체 clk 및 이전 및 현재 속도에 대한 포인터를 알리미 콜백에 전달합니다.
+ * 내부 클럭 코드에 의해서만 호출되도록되어 있습니다. 모두가 정상적으로 된 경우
+ * 호출 된 마지막 드라이버에서 NOTIFY_DONE을 반환하고, 드라이버가 이를 반환하면
+ * 즉시 NOTIFY_STOP 또는 NOTIFY_BAD를 반환합니다.
  */
 static int __clk_notify(struct clk_core *clk, unsigned long msg,
 		unsigned long old_rate, unsigned long new_rate)
@@ -1550,6 +1586,22 @@ static struct clk_core *__clk_set_parent_before(struct clk_core *clk,
 	 *
 	 * See also: Comment for clk_set_parent() below.
 	 */
+	/* IAMROOT-12 fehead (2017-03-25):
+	 * --------------------------
+	 * 부모 사이에 준비 상태를 마이그레이션하고 clk_enable()을 사용하여
+	 * 경쟁을 방지하십시오.
+	 * 
+	 * 시계가 준비되지 않았다면, 우리는 이미 준비 잠금을 가지고 있기 때문에
+	 * clk_enable()에 대한 경주는 불가능합니다. clk_enable()에 대한 이후의
+	 * 호출은 clk_prepare()가 선행되어야합니다.
+	 * 
+	 * 시계가 준비된 경우 준비된 상태를 새 상위 항목으로 마이그레이션하고
+	 * 시계 및 새 상위 항목을 강제로 설정하여 clk_enable()을 사용하여 경주
+	 * 를 방지하십시오. 이렇게하면 이후의 모든 clk_enable() 호출이 하드웨어
+	 * 및 소프트웨어 상태와 관련하여 실질적으로 NOP가됩니다.
+	 * 
+	 * 참고 : 아래의 clk_set_parent()에 대한 설명.
+	 */
 	if (clk->prepare_count) {
 		clk_core_prepare(parent);
 		flags = clk_enable_lock();
@@ -1686,6 +1738,10 @@ static void clk_calc_subtree(struct clk_core *clk, unsigned long new_rate,
  * calculate the new rates returning the topmost clock that has to be
  * changed.
  */
+/* IAMROOT-12 fehead (2017-03-25):
+ * --------------------------
+ * 변경되어야하는 최상위 클럭을 반환하는 새 속도를 계산하십시오.
+ */
 static struct clk_core *clk_calc_new_rates(struct clk_core *clk,
 					   unsigned long rate)
 {
@@ -1710,6 +1766,10 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *clk,
 	clk_core_get_boundaries(clk, &min_rate, &max_rate);
 
 	/* find the closest rate and parent clk/rate */
+	/* IAMROOT-12 fehead (2017-03-25):
+	 * --------------------------
+	 * determine -> 영어 사전 - 결정, mux에 구현된 함수
+	 */
 	if (clk->ops->determine_rate) {
 		parent_hw = parent ? parent->hw : NULL;
 		new_rate = clk->ops->determine_rate(clk->hw, rate,
@@ -1767,6 +1827,13 @@ out:
  * so that in case of an error we can walk down the whole tree again and
  * abort the change.
  */
+/* IAMROOT-12 fehead (2017-03-25):
+ * --------------------------
+ * 하위 트리의 요율 변경 사항에 대해 알립니다. 오류가 발생하면 전체 나무를 다시
+ * 걸어 내려 가면서 변경을 중단 할 수 있도록 항상 전체 나무를 걸어보십시오.
+ *
+ * event : PRE_RATE_CHANGE, POST_RATE_CHANGE, ABORT_RATE_CHANGE
+ */
 static struct clk_core *clk_propagate_rate_change(struct clk_core *clk,
 						  unsigned long event)
 {
@@ -1777,6 +1844,10 @@ static struct clk_core *clk_propagate_rate_change(struct clk_core *clk,
 		return NULL;
 
 	if (clk->notifier_count) {
+		/* IAMROOT-12 fehead (2017-03-25):
+		 * --------------------------
+		 * event : PRE_RATE_CHANGE
+		 */
 		ret = __clk_notify(clk, event, clk->rate, clk->new_rate);
 		if (ret & NOTIFY_STOP_MASK)
 			fail_clk = clk;
@@ -1804,6 +1875,10 @@ static struct clk_core *clk_propagate_rate_change(struct clk_core *clk,
 /*
  * walk down a subtree and set the new rates notifying the rate
  * change on the way
+ */
+/* IAMROOT-12 fehead (2017-03-25):
+ * --------------------------
+ * 하위 트리를 걸어 내려 가면서 요금 변경을 알리는 새 요금을 설정합니다.
  */
 static void clk_change_rate(struct clk_core *clk)
 {
@@ -1919,6 +1994,27 @@ static int clk_core_set_rate_nolock(struct clk_core *clk,
  * rates for the clocks and fires off POST_RATE_CHANGE notifiers.
  *
  * Returns 0 on success, -EERROR otherwise.
+ */
+/* IAMROOT-12 fehead (2017-03-25):
+ * --------------------------
+ * clk_set_rate - clk에 대한 새 비율 지정
+ * @clk : 비율이 변경되는 clk
+ * @rate : clk의 새 비율
+ *
+ * 가장 간단한 경우 clk_set_rate는 clk의 비율 만 조정합니다.
+ *
+ * CLK_SET_RATE_PARENT 플래그를 설정하면 속도 변경 작업이 clk의 상위 항목까지
+ * 전파됩니다. 이것이 일어날 지 여부는 clk의 .round_rate 구현의 결과에 달려 있습
+ * 니다. .round_rate를 호출 한 후 * parent_rate가 변경되지 않으면 업스트림 부모
+ * 전파가 무시됩니다. *parent_rate가 clk의 부모에 대한 새로운 비율로 돌아 오면
+ * clk의 부모에게 전달하고 그 비율을 설정합니다. Clk가 CLK_SET_RATE_PARENT 플래
+ * 그를 지원하지 않거나 .round_rate가 clk의 parent_rate에 대한 변경 요청을 중지
+ * 할 때까지 상향 전파가 계속됩니다.
+ *
+ * 비율 변경은 트리 트래버 설을 통해 이루어지며 이는 또한 POST_RATE_CHANGE 알림
+ * 에서 클록 속도를 재 계산하고 실행합니다.
+ *
+ * 성공하면 0을, 그렇지 않으면 -EERROR를 리턴합니다.
  */
 int clk_set_rate(struct clk *clk, unsigned long rate)
 {
@@ -3031,6 +3127,25 @@ void __clk_put(struct clk *clk)
  * Returns -EINVAL if called with null arguments, -ENOMEM upon
  * allocation failure; otherwise, passes along the return value of
  * srcu_notifier_chain_register().
+ */
+/* IAMROOT-12 fehead (2017-03-25):
+ * --------------------------
+ * clk_notifier_register - clk 속도 변경 알림 추가
+ * @clk : 시계 clk * 구조체
+ * @nb : 콜백 정보가있는 struct notifier_block *
+ *
+ * clk의 요금이 변경되면 알림을 요청합니다. SRCU 알리미를 차단하기를 원하고
+ * 알리미 등록 해제가 흔하지 않기 때문에 SRCU 알리미를 사용합니다. 알리미와
+ * 관련된 콜백은 최상위 clk API를 호출하여 clk 프레임 워크로 다시 들어가서는
+ * 안됩니다. 이 경우 중첩 된 prepare_lock 뮤텍스가 발생합니다.
+ *
+ * 모든 알림 케이스 (사전, 사후 및 중단 비율 변경)에서 원본 클럭 속도는 struct
+ * clk_notifier_data.old_rate를 통해 콜백에 전달되고 새 빈도는 struct
+ * clk_notifier_data.new_rate를 통해 전달됩니다.
+ *
+ * clk_notifier_register()는 비 - 원자 컨텍스트에서 호출해야합니다. 인수가 널인
+ * 경우 호출되면 -EINVAL, 할당이 실패하면 -ENOMEM을 리턴합니다. 그렇지 않으면
+ * srcu_notifier_chain_register()의 반환 값을 전달합니다.
  */
 int clk_notifier_register(struct clk *clk, struct notifier_block *nb)
 {

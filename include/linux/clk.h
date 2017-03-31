@@ -56,6 +56,15 @@ struct clk;
  * POST_RATE_CHANGE - clk rate 변경이 성공적으로 완료된 후에 호출됩니다. 콜백은
  *	항상 NOTIFY_DONE 또는 NOTIFY_OK를 반환해야합니다.
  */
+
+/* IAMROOT-12:
+ * -------------
+ * 클럭 통지 요청을 한 클럭들에 대해 rate 검토를 하는데 
+ * 정상인 경우 pre -> post를 보내고
+ * 실패인 경우 pre -> abort를 보낸다.
+ *
+ * 변경과 관련된 토플로지에 범위에 대해 통지를 한다.
+ */
 #define PRE_RATE_CHANGE			BIT(0)
 #define POST_RATE_CHANGE		BIT(1)
 #define ABORT_RATE_CHANGE		BIT(2)

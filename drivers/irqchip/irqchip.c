@@ -21,6 +21,10 @@
 static const struct of_device_id
 irqchip_of_match_end __used __section(__irqchip_of_table_end);
 
+/* IAMROOT-12 fehead (2017-04-01):
+ * --------------------------
+ * IRQCHIP_DECLARE 참고
+ */
 extern struct of_device_id __irqchip_of_table[];
 
 void __init irqchip_init(void)

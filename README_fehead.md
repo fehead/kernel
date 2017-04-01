@@ -305,3 +305,38 @@
 - clk_notifier_register
 ```
 ```
+
+### 2017.04.01
+#### 참고
+- http://elinux.org/images/b/b8/Elc2013_Clement.pdf
+- http://jake.dothome.co.kr/
+
+#### 진도
+- early_irq_init
+```
+	init_irq_default_affinity
+	arch_probe_nr_irqs
+	alloc_desc
+		alloc_masks
+			zalloc_cpumask_var_node
+		desc_set_defaults
+			irq_settings_clr_and_set
+			irqd_set
+			desc_smp_init
+	irq_insert_desc
+```
+
+- init_IRQ
+```
+	bcm2709_init_irq
+		armctrl_init
+	irqchip_init
+		of_irq_init
+			of_irq_find_parent
+			bcm2836_arm_irqchip_l1_intc_of_init
+			bcm2836_armctrl_of_init
+			gic_of_init
+				of_iomap
+					of_address_to_resource
+						of_get_address
+```

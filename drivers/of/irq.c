@@ -515,6 +515,12 @@ void __init of_irq_init(const struct of_device_id *matches)
 	 * That one goes first, followed by the controllers that reference it,
 	 * followed by the ones that reference the 2nd level controllers, etc.
 	 */
+	/* IAMROOT-12 fehead (2017-04-01):
+	 * --------------------------
+	 * 루트 irq 컨트롤러는 interrupt-parent가없는 컨트롤러입니다. 먼저
+	 * 컨트롤러를 참조한 다음 2 번째 레벨 컨트롤러를 참조하는 컨트롤러
+	 * 등이옵니다.
+	 */
 	while (!list_empty(&intc_desc_list)) {
 		/*
 		 * Process all controllers with the current 'parent'.
@@ -541,6 +547,15 @@ void __init of_irq_init(const struct of_device_id *matches)
 			pr_debug("of_irq_init: init %s @ %p, parent %p\n",
 				 match->compatible,
 				 desc->dev, desc->interrupt_parent);
+
+			/* IAMROOT-12 fehead (2017-04-01):
+			 * --------------------------
+			 * pi2 
+			 *	bcm2836_arm_irqchip_l1_intc_of_init
+			 * 	bcm2836_armctrl_of_init
+			 * arm gic
+			 *	gic_of_init
+			 */
 			irq_init_cb = (of_irq_init_cb_t)match->data;
 			ret = irq_init_cb(desc->dev, desc->interrupt_parent);
 			if (ret) {

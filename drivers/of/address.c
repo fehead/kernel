@@ -494,6 +494,26 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
 	 * As far as we know, this damage only exists on Apple machines, so
 	 * This code is only enabled on powerpc. --gcl
 	 */
+	/* IAMROOT-12 fehead (2017-04-01):
+	 * --------------------------
+	 * 일반적으로 "ranges"속성이 없다는 것은 변환 할 수없는 경계를 넘어서고
+	 * 현재의 주소 아래에있는 주소를 CPU의 실제 주소로 변환 할 수 없다는 것
+	 * 을 의미합니다. 불행하게도 이것은 스펙에서 매우 명확하지만 애플이 이해
+	 * 한 것이 아니며 "범위"속성이없는 / uni-n 또는 / ht 노드와 그 아래에
+	 * 완벽하게 사용할 수있는 매핑 된 장치가 많이 있습니다. 따라서 우리는
+	 * "범위"가 없으면 해당 수준에서 1 : 1 변환을 의미하는 빈 "범위"속성과
+	 * 동일하게 취급합니다. 처음에는 번역되지 않아야 할 주소를 번역하지 않는
+	 * 것은 호출자의 몫입니다. - 벤.
+	 *
+	 * 우리가 아는 한이 피해는 Apple 컴퓨터에서만 발생하므로
+	 * 이 코드는 powerpc에서만 사용할 수 있습니다. --gcl
+	 */
+	/* IAMROOT-12 fehead (2017-04-01):
+	 * --------------------------
+	 * rprop = "ranges"
+	 * ranges = <0x7e000000 0x3f000000 0x1000000>;
+	 * rlen = 12
+	 */
 	ranges = of_get_property(parent, rprop, &rlen);
 	if (ranges == NULL && !of_empty_ranges_quirk(parent)) {
 		pr_debug("OF: no ranges; cannot translate\n");
@@ -512,6 +532,10 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
 	rlen /= 4;
 	rone = na + pna + ns;
 	for (; rlen >= rone; rlen -= rone, ranges += rone) {
+		/* IAMROOT-12 fehead (2017-04-01):
+		 * --------------------------
+		 * .map = of_bus_default_map,
+		 */
 		offset = bus->map(addr, ranges, na, ns, pna);
 		if (offset != OF_BAD_ADDR)
 			break;
@@ -527,6 +551,10 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
 	pr_debug("OF: with offset: %llx\n", (unsigned long long)offset);
 
 	/* Translate it into parent bus space */
+	/* IAMROOT-12 fehead (2017-04-01):
+	 * --------------------------
+	 * .translate = of_bus_default_translate,
+	 */
 	return pbus->translate(addr, offset, pna);
 }
 
@@ -641,7 +669,30 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
 	parent = of_get_parent(dev);
 	if (parent == NULL)
 		return NULL;
+/* IAMROOT-12 fehead (2017-04-01):
+ * --------------------------
+ * 
+ * static struct of_bus of_busses[] = {
+ *	...
+ *	{
+ *		.name = "default",
+ *		.addresses = "reg",
+ *		.match = NULL,
+ *		.count_cells = of_bus_default_count_cells,
+ *		.map = of_bus_default_map,
+ *		.translate = of_bus_default_translate,
+ *		.get_flags = of_bus_default_get_flags,
+ *	},
+ * };
+ */
 	bus = of_match_bus(parent);
+	/* IAMROOT-12 fehead (2017-04-01):
+	 * --------------------------
+	 * count_cells
+	 *	of_bus_pci_count_cells
+	 *	of_bus_isa_count_cells
+	 *	of_bus_default_count_cells - pi2, arm
+	 */
 	bus->count_cells(dev, &na, &ns);
 	of_node_put(parent);
 	if (!OF_CHECK_ADDR_COUNT(na))
@@ -658,6 +709,10 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
 		if (i == index) {
 			if (size)
 				*size = of_read_number(prop + na, ns);
+			/* IAMROOT-12 fehead (2017-04-01):
+			 * --------------------------
+			 *.get_flags = of_bus_default_get_flags,
+			 */
 			if (flags)
 				*flags = bus->get_flags(prop);
 			return prop;

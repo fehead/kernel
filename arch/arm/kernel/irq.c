@@ -102,6 +102,10 @@ void __init init_IRQ(void)
 {
 	int ret;
 
+	/* IAMROOT-12 fehead (2017-04-01):
+	 * --------------------------
+	 * pi2 : bcm2709_init_irq
+	 */
 	if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
 		irqchip_init();
 	else

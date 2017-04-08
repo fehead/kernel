@@ -97,6 +97,13 @@ struct irq_chip gic_arch_extn = {
 #define MAX_GIC_NR	1
 #endif
 
+/* IAMROOT-12 fehead (2017-04-08):
+ * --------------------------
+ * CONFIG_GIC_NON_BANKED 가 설정된경우
+ *	gic_data[?].get_base = gic_get_percpu_base
+ * 아닌경우
+ *	gic_data[?].get_base = gic_get_common_base
+ */
 static struct gic_chip_data gic_data[MAX_GIC_NR] __read_mostly;
 
 #ifdef CONFIG_GIC_NON_BANKED
@@ -981,6 +988,10 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 	/*
 	 * Find out how many interrupts are supported.
 	 * The GIC only supports up to 1020 interrupt sources.
+	 */
+	/* IAMROOT-12 fehead (2017-04-08):
+	 * --------------------------
+	 * GIC_DIST_CTR : GICD_TYPER - Control Type Register
 	 */
 	gic_irqs = readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_CTR) & 0x1f;
 	gic_irqs = (gic_irqs + 1) * 32;

@@ -340,3 +340,19 @@
 					of_address_to_resource
 						of_get_address
 ```
+
+### 2017.04.08
+#### 참고
+- http://jake.dothome.co.kr/ic
+- http://jake.dothome.co.kr/interrupts-3
+
+#### 진도
+```
+						__of_address_to_resource
+							of_translate_address
+								__of_translate_address
+									of_translate_one
+				gic_init_bases
+					readl_relaxed
+
+```

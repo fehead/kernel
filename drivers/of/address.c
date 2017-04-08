@@ -63,6 +63,11 @@ static u64 of_bus_default_map(__be32 *addr, const __be32 *range,
 {
 	u64 cp, s, da;
 
+/* IAMROOT-12 fehead (2017-04-08):
+ * --------------------------
+ * ranges = <0x7e000000 0x3f000000 0x1000000 0x40000000 0x40000000 0x40000>;
+ * ranges = <cp ? s   cp ? s  ...>
+ */
 	cp = of_read_number(range, na);
 	s  = of_read_number(range + na + pna, ns);
 	da = of_read_number(addr, na);
@@ -502,6 +507,10 @@ static int of_empty_ranges_quirk(struct device_node *np)
 	return false;
 }
 
+/* IAMROOT-12 fehead (2017-04-08):
+ * --------------------------
+ * 정상적인 변환일경우 0을 반환한다.
+ */
 static int of_translate_one(struct device_node *parent, struct of_bus *bus,
 			    struct of_bus *pbus, __be32 *addr,
 			    int na, int ns, int pna, const char *rprop)
@@ -543,7 +552,8 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
 	/* IAMROOT-12 fehead (2017-04-01):
 	 * --------------------------
 	 * rprop = "ranges"
-	 * ranges = <0x7e000000 0x3f000000 0x1000000>;
+	 * ranges = <0x7e000000 0x3f000000 0x1000000>; # 4.1
+	 * # ranges = <0x7e000000 0x3f000000 0x1000000 0x40000000 0x40000000 0x40000>; # 4.4
 	 * rlen = 12
 	 */
 	ranges = of_get_property(parent, rprop, &rlen);
@@ -600,6 +610,15 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
  * that can be mapped to a cpu physical address). This is not really specified
  * that way, but this is traditionally the way IBM at least do things
  */
+/* IAMROOT-12 fehead (2017-04-08):
+ * --------------------------
+ * 장치 트리의 주소를 CPU 실제 주소로 변환하면 트리를 따라 가면서 다양한 버스
+ * 매핑을 적용합니다.
+ *
+ * 참고 : #size-cells == 0 인 모든 수준을 넘어서서 전환이 불가능하다는 것을
+ * 의미합니다 (즉, CPU 실제 주소에 매핑 할 수있는 값을 처리하지 않음). 이것은
+ * 실제로 그런 식으로 지정되지는 않지만, 이는 IBM이 적어도 일을하는 방식입니다
+ */
 static u64 __of_translate_address(struct device_node *dev,
 				  const __be32 *in_addr, const char *rprop)
 {
@@ -621,6 +640,10 @@ static u64 __of_translate_address(struct device_node *dev,
 	bus = of_match_bus(parent);
 
 	/* Count address cells & copy address locally */
+	/* IAMROOT-12 fehead (2017-04-08):
+	 * --------------------------
+	 * pi2 : .count_cells = of_bus_default_count_cells,
+	 */
 	bus->count_cells(dev, &na, &ns);
 	if (!OF_CHECK_COUNTS(na, ns)) {
 		pr_debug("OF: Bad cell count for %s\n", of_node_full_name(dev));
@@ -753,6 +776,10 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
 		return NULL;
 	psize /= 4;
 
+	/* IAMROOT-12 fehead (2017-04-08):
+	 * --------------------------
+	 * pi2 : na = 1, ns = 1
+	 */
 	onesize = na + ns;
 	for (i = 0; psize >= onesize; psize -= onesize, prop += onesize, i++)
 		if (i == index) {
@@ -766,7 +793,7 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
  */
 			/* IAMROOT-12 fehead (2017-04-01):
 			 * --------------------------
-			 *.get_flags = of_bus_default_get_flags,
+			 *"reg" : .get_flags = of_bus_default_get_flags,
 			 */
 			if (flags)
 				*flags = bus->get_flags(prop);

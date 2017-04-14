@@ -63,6 +63,18 @@ static u64 of_bus_default_map(__be32 *addr, const __be32 *range,
 {
 	u64 cp, s, da;
 
+/* IAMROOT-12:
+ * -------------
+ * ranges = <(num1=cp) (num2=) (num3=s)>;
+ *           da(addr) - cp하여 변환한다. (s 사이즈 만큼만)
+ *
+ * 예) 인터럽트 컨트롤러 reg = <0x7e00b200 0x200>
+ *     ranges = <0x7e000000 0x3f000000 0x1000000>
+ *     da(addr)=0x7e00_b200, 
+ *     cp=0x7e00_0000,
+ *     s=0x100_0000, 
+ *     da - cp = 0xb200
+ */
 /* IAMROOT-12 fehead (2017-04-08):
  * --------------------------
  * ranges = <0x7e000000 0x3f000000 0x1000000 0x40000000 0x40000000 0x40000>;
@@ -76,6 +88,10 @@ static u64 of_bus_default_map(__be32 *addr, const __be32 *range,
 		 (unsigned long long)cp, (unsigned long long)s,
 		 (unsigned long long)da);
 
+/* IAMROOT-12:
+ * -------------
+ * 범위를 벗어나는 변환은 OF_BAD_ADDR을 반환한다.
+ */
 	if (da < cp || da >= (cp + s))
 		return OF_BAD_ADDR;
 	return da - cp;
@@ -453,6 +469,13 @@ static struct of_bus of_busses[] = {
 		.get_flags = of_bus_isa_get_flags,
 	},
 	/* Default */
+
+/* IAMROOT-12:
+ * -------------
+ * 디바이스 트리에서 주소 및 사이즈 표기는 "reg" 속성으로 한다.
+ * 위 두 가지지 타입의 (*match) 함수만 사용하고 그 외의 것은 
+ * default로 인식하기 때문에 (*match) = null로 한다.
+ */
 	{
 		.name = "default",
 		.addresses = "reg",
@@ -520,6 +543,11 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
 	int rone;
 	u64 offset = OF_BAD_ADDR;
 
+/* IAMROOT-12:
+ * -------------
+ * 변환이 성공하면 0을 반환한다.
+ */
+
 	/* Normally, an absence of a "ranges" property means we are
 	 * crossing a non-translatable boundary, and thus the addresses
 	 * below the current not cannot be converted to CPU physical ones.
@@ -535,6 +563,7 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
 	 * As far as we know, this damage only exists on Apple machines, so
 	 * This code is only enabled on powerpc. --gcl
 	 */
+<<<<<<< HEAD
 	/* IAMROOT-12 fehead (2017-04-01):
 	 * --------------------------
 	 * 일반적으로 "ranges"속성이 없다는 것은 변환 할 수없는 경계를 넘어서고
@@ -549,6 +578,11 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
 	 * 우리가 아는 한이 피해는 Apple 컴퓨터에서만 발생하므로
 	 * 이 코드는 powerpc에서만 사용할 수 있습니다. --gcl
 	 */
+/* IAMROOT-12:
+ * -------------
+ * of_empty_ranges_quirk() 함수는 ppc 아키텍처에서만 사용되고,
+ * arm 아키텍처에서는 항상 false를 반환한다.
+ */
 	/* IAMROOT-12 fehead (2017-04-01):
 	 * --------------------------
 	 * rprop = "ranges"
@@ -573,12 +607,27 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
 	/* Now walk through the ranges */
 	rlen /= 4;
 	rone = na + pna + ns;
+
+/* IAMROOT-12:
+ * -------------
+ * ranges 루프를 돌며 변환을 시도한다.
+ */
 	for (; rlen >= rone; rlen -= rone, ranges += rone) {
+/* IAMROOT-12:
+ * -------------
+ * 디폴트 generic 버스인 경우 of_bus_default_map() 함수에서 
+ * ranges 값을 사용하여 변환한다.
+ */
 		/* IAMROOT-12 fehead (2017-04-01):
 		 * --------------------------
 		 * .map = of_bus_default_map,
 		 */
 		offset = bus->map(addr, ranges, na, ns, pna);
+
+/* IAMROOT-12:
+ * -------------
+ * 변환이 성공한 경우 더 이상 변환하지 않도록 루프를 빠져나간다.
+ */
 		if (offset != OF_BAD_ADDR)
 			break;
 	}
@@ -593,6 +642,12 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
 	pr_debug("OF: with offset: %llx\n", (unsigned long long)offset);
 
 	/* Translate it into parent bus space */
+/* IAMROOT-12:
+ * -------------
+ * 디폴트 generic 버스의 경우 of_bus_default_translate() 함수를 호출한다.
+ *
+ * addr[] + offset 하여 반환한다.
+ */
 	/* IAMROOT-12 fehead (2017-04-01):
 	 * --------------------------
 	 * .translate = of_bus_default_translate,
@@ -634,6 +689,11 @@ static u64 __of_translate_address(struct device_node *dev,
 	of_node_get(dev);
 
 	/* Get parent & match bus type */
+
+/* IAMROOT-12:
+ * -------------
+ * 부모의 버스를 가져온다. (pci, isa, 디폴트 generic 버스)
+ */
 	parent = of_get_parent(dev);
 	if (parent == NULL)
 		goto bail;
@@ -656,6 +716,13 @@ static u64 __of_translate_address(struct device_node *dev,
 	of_dump_addr("OF: translating address:", addr, na);
 
 	/* Translate */
+
+/* IAMROOT-12:
+ * -------------
+ * 버스가 하이라키로 구성될 수 있으므로 
+ * ranges 속성도 그 만큼 존재하고 번역되어야 한다.
+ * 디바이스가 사용하는 버스부터 루트까지 찾아가면서 변환을 시도한다.
+ */
 	for (;;) {
 		/* Switch to parent bus */
 		of_node_put(dev);
@@ -663,6 +730,11 @@ static u64 __of_translate_address(struct device_node *dev,
 		parent = of_get_parent(dev);
 
 		/* If root, we have finished */
+
+/* IAMROOT-12:
+ * -------------
+ * 루트 노드에 다다르면 더 이상 변환할 필요 없으므로 루프를 빠져나간다.
+ */
 		if (parent == NULL) {
 			pr_debug("OF: reached root node\n");
 			result = of_read_number(addr, na);
@@ -682,6 +754,11 @@ static u64 __of_translate_address(struct device_node *dev,
 		    pbus->name, pna, pns, of_node_full_name(parent));
 
 		/* Apply bus translation */
+
+/* IAMROOT-12:
+ * -------------
+ * 변환 실패(0) 시 더 이상 비교할 필요 없으므로 루프를 break
+ */
 		if (of_translate_one(dev, bus, pbus, addr, na, ns, pna, rprop))
 			break;
 
@@ -701,6 +778,11 @@ static u64 __of_translate_address(struct device_node *dev,
 
 u64 of_translate_address(struct device_node *dev, const __be32 *in_addr)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * 디바이스 주소의 변환에 버스의 ranges 속성을 사용한다.
+ */
 	return __of_translate_address(dev, in_addr, "ranges");
 }
 EXPORT_SYMBOL(of_translate_address);
@@ -758,6 +840,9 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
  * of_bus_pci_count_cells(),    <- addr-cells=3, size-cells=2로 고정
  * of_bus_isa_count_cells(),    <- addr-cells=2, size-cells=1로 고정
  * of_bus_default_count_cells() <- 디바이스트리에서 알아온다.
+ *
+ * na: address cells
+ * ns: size cells
  */
 	bus->count_cells(dev, &na, &ns);
 	of_node_put(parent);
@@ -776,6 +861,10 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
 		return NULL;
 	psize /= 4;
 
+/* IAMROOT-12:
+ * -------------
+ * regs 속성에서 배열을 처리하기 위해 루프를 돈다.
+ */
 	/* IAMROOT-12 fehead (2017-04-08):
 	 * --------------------------
 	 * pi2 : na = 1, ns = 1
@@ -926,6 +1015,11 @@ static int __of_address_to_resource(struct device_node *dev,
 
 	if ((flags & (IORESOURCE_IO | IORESOURCE_MEM)) == 0)
 		return -EINVAL;
+
+/* IAMROOT-12:
+ * -------------
+ * 디바이스 주소의 변환에 버스의 ranges 속성을 사용한다.
+ */
 	taddr = of_translate_address(dev, addrp);
 	if (taddr == OF_BAD_ADDR)
 		return -EINVAL;
@@ -942,6 +1036,11 @@ static int __of_address_to_resource(struct device_node *dev,
 		r->end = taddr + size - 1;
 	}
 	r->flags = flags;
+
+/* IAMROOT-12:
+ * -------------
+ * "reg-names" 속성이 제공되는 경우가 아니면 디바이스의 full_name을 사용한다.
+ */
 	r->name = name ? name : dev->full_name;
 
 	return 0;
@@ -979,6 +1078,11 @@ int of_address_to_resource(struct device_node *dev, int index,
  */
 	of_property_read_string_index(dev, "reg-names",	index, &name);
 
+
+/* IAMROOT-12:
+ * -------------
+ * 리소스의 물리 시작 주소와 끝 주소 및 플래그 정보를 알아온다.
+ */
 	return __of_address_to_resource(dev, addrp, size, flags, name, r);
 }
 EXPORT_SYMBOL_GPL(of_address_to_resource);
@@ -1013,9 +1117,17 @@ void __iomem *of_iomap(struct device_node *np, int index)
 {
 	struct resource res;
 
+/* IAMROOT-12:
+ * -------------
+ * 디바이스의 물리 주소 정보를 resouce로 알아온다.
+ */
 	if (of_address_to_resource(np, index, &res))
 		return NULL;
 
+/* IAMROOT-12:
+ * -------------
+ * 알아온 resource 정보로 io 리매핑한다.
+ */
 	return ioremap(res.start, resource_size(&res));
 }
 EXPORT_SYMBOL(of_iomap);

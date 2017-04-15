@@ -40,6 +40,11 @@ static void irq_domain_check_hierarchy(struct irq_domain *domain);
  * Allocates and initialize and irq_domain structure.
  * Returns pointer to IRQ domain, or NULL on failure.
  */
+/* IAMROOT-12 fehead (2017-04-15):
+ * --------------------------
+ * irq_domain을 생성후에 irq_domain_list에 추가한다.
+ * return __irq_domain_add(node, size, size, 0, ops, gic);
+ */
 struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
 				    irq_hw_number_t hwirq_max, int direct_max,
 				    const struct irq_domain_ops *ops,

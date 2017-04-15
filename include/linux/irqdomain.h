@@ -171,6 +171,11 @@ extern void irq_set_default_host(struct irq_domain *host);
  * @ops: map/unmap domain callbacks
  * @host_data: Controller private data pointer
  */
+/* IAMROOT-12 fehead (2017-04-15):
+ * --------------------------
+ * irq_domain을 생성후에 irq_domain_list에 추가한다.
+ * gic->domain = irq_domain_add_linear(node, gic_irqs, ops, gic);
+ */
 static inline struct irq_domain *irq_domain_add_linear(struct device_node *of_node,
 					 unsigned int size,
 					 const struct irq_domain_ops *ops,

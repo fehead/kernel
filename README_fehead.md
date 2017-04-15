@@ -344,6 +344,7 @@
 ### 2017.04.08
 #### 참고
 - http://jake.dothome.co.kr/ic
+- http://jake.dothome.co.kr/interrupts-2
 - http://jake.dothome.co.kr/interrupts-3
 
 #### 진도
@@ -355,4 +356,19 @@
 				gic_init_bases
 					readl_relaxed
 
+```
+
+### 2017.04.15
+#### 참고
+- http://jake.dothome.co.kr/interrupts-3
+
+#### 진도
+- gic_init_bases
+```
+	irq_domain_add_linear
+		__irq_domain_add
+	gic_dist_init
+	gic_cpu_init
+		gic_get_cpumask
+		gic_cpu_config
 ```

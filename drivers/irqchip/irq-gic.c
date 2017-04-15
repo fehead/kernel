@@ -855,6 +855,10 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
 
 	/* For SPIs, we need to add 16 more to get the GIC irq ID number */
 	if (!intspec[0]) {
+		/* IAMROOT-12 fehead (2017-04-15):
+		 * --------------------------
+		 * gic_default_routable_irq_domain_ops;
+		 */
 		ret = gic_routable_irq_domain_ops->xlate(d, controller,
 							 intspec,
 							 intsize,

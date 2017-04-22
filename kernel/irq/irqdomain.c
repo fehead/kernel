@@ -44,6 +44,8 @@ static void irq_domain_check_hierarchy(struct irq_domain *domain);
  * --------------------------
  * irq_domain을 생성후에 irq_domain_list에 추가한다.
  * return __irq_domain_add(node, size, size, 0, ops, gic);
+ *
+ * gic_init_bases -> irq_domain_add_linear -> __irq_domain_add
  */
 struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
 				    irq_hw_number_t hwirq_max, int direct_max,
@@ -238,6 +240,12 @@ struct irq_domain *irq_find_host(struct device_node *node)
 	 * it might potentially be set to match all interrupts in
 	 * the absence of a device node. This isn't a problem so far
 	 * yet though...
+	 */
+	/* IAMROOT-12 fehead (2017-04-22):
+	 * --------------------------
+	 * 우리는 장치 노드가 없을 때 모든 인터럽트와 일치하도록 잠재적으로 설정
+	 * 될 수 있기 때문에 레거시 컨트롤러를 마지막으로 일치 시키길 원할 수
+	 * 있습니다. 지금까지는 문제가되지 않았습니다...
 	 */
 	mutex_lock(&irq_domain_mutex);
 	list_for_each_entry(h, &irq_domain_list, link) {
@@ -518,6 +526,10 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
 	}
 
 	/* If domain has no translation, then we assume interrupt line */
+	/* IAMROOT-12 fehead (2017-04-22):
+	 * --------------------------
+	 * gic경우 .xlate = gic_irq_domain_xlate,
+	 */
 	if (domain->ops->xlate == NULL)
 		hwirq = irq_data->args[0];
 	else {
@@ -761,6 +773,10 @@ const struct irq_domain_ops irq_domain_simple_ops = {
 };
 EXPORT_SYMBOL_GPL(irq_domain_simple_ops);
 
+/* IAMROOT-12 fehead (2017-04-22):
+ * --------------------------
+ * virq = irq_domain_alloc_descs(irq_base, nr_irqs, 0, node);
+ */
 static int irq_domain_alloc_descs(int virq, unsigned int cnt,
 				  irq_hw_number_t hwirq, int node)
 {
@@ -1092,6 +1108,11 @@ static int irq_domain_alloc_irqs_recursive(struct irq_domain *domain,
  * irq_domain_activate_irq(), is to program hardwares with preallocated
  * resources. In this way, it's easier to rollback when failing to
  * allocate resources.
+ */
+/* IAMROOT-12 fehead (2017-04-22):
+ * --------------------------
+ * return __irq_domain_alloc_irqs(domain, -1, nr_irqs, node, arg, false);
+ * irq_of_parse_and_map -> irq_create_of_mapping -> irq_domain_alloc_irqs
  */
 int __irq_domain_alloc_irqs(struct irq_domain *domain, int irq_base,
 			    unsigned int nr_irqs, int node, void *arg,

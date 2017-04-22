@@ -101,6 +101,14 @@ struct device_node *of_irq_find_parent(struct device_node *child)
  * input, walks the tree looking for any interrupt-map properties, translates
  * the specifier for each map, and then returns the translated map.
  */
+/* IAMROOT-12 fehead (2017-04-22):
+ * --------------------------
+ * 이 함수는 로우 레벨 인터럽트 트리 워킹 함수입니다. 예를 들어 부모를위한 장치
+ * 노드가 없을 때 PCI 인터럽트를 해결할 때와 같이 합성 된 reg 및 인터럽트 속성을
+ * 사용하여 부분적으로 살펴볼 수 있습니다. 인터럽트 지정자 구조를 입력으로 사용
+ * 하고 트리를 탐색하여 인터럽트 맵 속성을 찾고 각 매핑에 대한 지정자를 변환 한
+ * 다음 변환 된 맵을 반환합니다.
+ */
 int of_irq_parse_raw(const __be32 *addr, struct of_phandle_args *out_irq)
 {
 	struct device_node *ipar, *tnode, *old = NULL, *newpar = NULL;
@@ -293,6 +301,12 @@ EXPORT_SYMBOL_GPL(of_irq_parse_raw);
  * This function resolves an interrupt for a node by walking the interrupt tree,
  * finding which interrupt controller node it is attached to, and returning the
  * interrupt specifier that can be used to retrieve a Linux IRQ number.
+ */
+/* IAMROOT-12 fehead (2017-04-22):
+ * --------------------------
+ * 이 함수는 인터럽트 트리를 걷고 노드가 연결된 인터럽트 컨트롤러 노드를 찾은
+ * 다음 Linux IRQ 번호를 검색하는 데 사용할 수있는 인터럽트 지정자를 반환하여
+ * 노드의 인터럽트를 해결합니다.
  */
 int of_irq_parse_one(struct device_node *device, int index, struct of_phandle_args *out_irq)
 {

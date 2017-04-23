@@ -379,7 +379,7 @@
 - http://forum.falinux.com/zbxe/index.php?document_srl=784699&mid=lecture_tip
 
 #### 진도
-- irq_of_parse_and_map
+- gic_of_init -> irq_of_parse_and_map
 ```
 	of_irq_parse_one
 		of_irq_parse_raw

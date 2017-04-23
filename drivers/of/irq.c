@@ -34,6 +34,14 @@
  * This function is a wrapper that chains of_irq_parse_one() and
  * irq_create_of_mapping() to make things easier to callers
  */
+/* IAMROOT-12 fehead (2017-04-23):
+ * --------------------------
+ * 인터럽트를 구문 분석하여 Linux virq 공간에 매핑합니다.
+ * 이 함수는 for_irq_parse_one()과 irq_create_of_mapping()을 묶어 호출자를 쉽게
+ * 만들어주는 래퍼입니다.
+ *
+ * gic_of_init -> irq_of_parse_and_map(node, 0);
+ */
 unsigned int irq_of_parse_and_map(struct device_node *dev, int index)
 {
 	struct of_phandle_args oirq;
@@ -370,6 +378,9 @@ EXPORT_SYMBOL_GPL(of_irq_parse_raw);
  * 이 함수는 인터럽트 트리를 걷고 노드가 연결된 인터럽트 컨트롤러 노드를 찾은
  * 다음 Linux IRQ 번호를 검색하는 데 사용할 수있는 인터럽트 지정자를 반환하여
  * 노드의 인터럽트를 해결합니다.
+ *
+ * gic_of_init -> irq_of_parse_and_map(node, 0)
+ *	->of_irq_parse_one(dev, 0, &oirq)
  */
 int of_irq_parse_one(struct device_node *device, int index, struct of_phandle_args *out_irq)
 {

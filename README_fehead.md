@@ -372,3 +372,30 @@
 		gic_get_cpumask
 		gic_cpu_config
 ```
+
+### 2017.04.22
+#### 참고
+- http://jake.dothome.co.kr
+- http://forum.falinux.com/zbxe/index.php?document_srl=784699&mid=lecture_tip
+
+#### 진도
+- gic_of_init -> irq_of_parse_and_map
+```
+	of_irq_parse_one
+		of_irq_parse_raw
+	irq_create_of_mapping
+		irq_find_host
+
+		irq_find_mapping
+			irq_domain_get_irq_data
+				irq_get_irq_data
+					irq_to_desc
+		irq_domain_alloc_irqs
+			__irq_domain_alloc_irqs
+				irq_domain_alloc_descs
+				irq_domain_alloc_irq_data
+						irq_domain_insert_irq_data
+						irq_domain_alloc_irqs_recursive
+
+
+```

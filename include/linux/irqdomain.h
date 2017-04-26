@@ -185,6 +185,9 @@ extern void irq_set_default_host(struct irq_domain *host);
  * --------------------------
  * irq_domain을 생성후에 irq_domain_list에 추가한다.
  * gic->domain = irq_domain_add_linear(node, gic_irqs, ops, gic);
+ * INPUT:	size = gic_irqs
+ *		ops = &gic_irq_domain_hierarchy_ops
+ *		host_data = &gic_data[gic_nr]
  */
 static inline struct irq_domain *irq_domain_add_linear(struct device_node *of_node,
 					 unsigned int size,

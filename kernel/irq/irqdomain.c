@@ -43,7 +43,12 @@ static void irq_domain_check_hierarchy(struct irq_domain *domain);
 /* IAMROOT-12 fehead (2017-04-15):
  * --------------------------
  * irq_domain을 생성후에 irq_domain_list에 추가한다.
- * return __irq_domain_add(node, size, size, 0, ops, gic);
+ * INPUT:	size = gic_irqs
+ *		hwirq_max = gic_irqs
+ *		ops = &gic_irq_domain_hierarchy_ops
+ *		host_data = &gic_data[gic_nr]
+ *		direct_max = 0
+ *	__irq_domain_add(node, size, size, 0, ops, gic);
  *
  * gic_init_bases -> irq_domain_add_linear -> __irq_domain_add
  */

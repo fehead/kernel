@@ -23,6 +23,15 @@
  * @compstr: compatible string of the irqchip driver
  * @fn: initialization function
  */
+/* IAMROOT-12 fehead (2017-04-15):
+ * --------------------------
+ * OF_DECLARE_2(irqchip, name, compat, fn)
+ *	_OF_DECLARE(irqchip, name, compat, fn, of_init_fn_2)
+ *		static const struct of_device_id __of_table_##name
+ *			__used __section(__irqchip_of_table)
+ *			 = { .compatible = compat,				\
+ *			     .data = fn }
+ */
 #define IRQCHIP_DECLARE(name, compat, fn) OF_DECLARE_2(irqchip, name, compat, fn)
 
 #endif

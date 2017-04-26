@@ -91,6 +91,11 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
  * the logical CPU numbering.  Let's use a mapping as returned
  * by the GIC itself.
  */
+/* IAMROOT-12 fehead (2017-04-26):
+ * --------------------------
+ * CPU 인터페이스의 GIC 매핑이 반드시 논리적 CPU 번호 매칭과 일치하지는 않습니
+ * 다. GIC 자체에서 반환 된 매핑을 사용합시다.
+ */
 #define NR_GIC_CPU_IF 8
 static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
 
@@ -1112,7 +1117,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 
 /* IAMROOT-12:
  * -------------
- * get_base = gic_get_percpu_base() 
+ * gic->get_base = gic_get_percpu_base() 
  *            -> raw_cpu_read(*base->percpu_base);
  */
 		gic_set_base_accessor(gic, gic_get_percpu_base);
@@ -1127,7 +1132,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 
 /* IAMROOT-12:
  * -------------
- * get_base = gic_get_common_base() 
+ * gic->get_base = gic_get_common_base() 
  *            -> base->common_base;
  */
 		gic_set_base_accessor(gic, gic_get_common_base);
@@ -1151,7 +1156,9 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
  */
 	/* IAMROOT-12 fehead (2017-04-08):
 	 * --------------------------
-	 * GIC_DIST_CTR : GICD_TYPER - Control Type Register
+	 * GIC_DIST_CTR : GICD_TYPER - Interrupt Controller Type Register
+	 *	통합된 GIC 설정 정보를 제공한다.
+	 *	 하위 5비트는 지원 가능한 인터럽트 개수(개당 32개)
 	 */
 	gic_irqs = readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_CTR) & 0x1f;
 	gic_irqs = (gic_irqs + 1) * 32;

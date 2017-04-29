@@ -183,6 +183,10 @@ int irq_startup(struct irq_desc *desc, bool resend)
 	irq_state_clr_disabled(desc);
 	desc->depth = 0;
 
+/* IAMROOT-12 fehead (2017-04-29):
+ * --------------------------
+ * .chip 은 gic_chip 참조
+ */
 	irq_domain_activate_irq(&desc->irq_data);
 	if (desc->irq_data.chip->irq_startup) {
 		ret = desc->irq_data.chip->irq_startup(&desc->irq_data);
@@ -711,6 +715,10 @@ void handle_percpu_devid_irq(unsigned int irq, struct irq_desc *desc)
 
 	kstat_incr_irqs_this_cpu(irq, desc);
 
+	/* IAMROOT-12 fehead (2017-04-29):
+	 * --------------------------
+	 * gic_chip 참조.
+	 */
 	if (chip->irq_ack)
 		chip->irq_ack(&desc->irq_data);
 
@@ -718,6 +726,10 @@ void handle_percpu_devid_irq(unsigned int irq, struct irq_desc *desc)
 	res = action->handler(irq, dev_id);
 	trace_irq_handler_exit(irq, action, res);
 
+	/* IAMROOT-12 fehead (2017-04-29):
+	 * --------------------------
+	 * gic_eoi_irq 참조.
+	 */
 	if (chip->irq_eoi)
 		chip->irq_eoi(&desc->irq_data);
 }

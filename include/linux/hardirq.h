@@ -32,6 +32,12 @@ extern void rcu_nmi_exit(void);
  * always balanced, so the interrupted value of ->hardirq_context
  * will always be restored.
  */
+/* IAMROOT-12 fehead (2017-04-29):
+ * --------------------------
+ * NMI 핸들러가 선점하지 않을 수도 있고 연산이 항상 균형을 유지하기 때문에
+ * ->hardirq_context에서 원자가 아닌 연산을 수행하는 것이 안전하므로
+ * ->hardirq_context의 중단 된 값이 항상 복원됩니다.
+ */
 #define __irq_enter()					\
 	do {						\
 		account_irq_enter_time(current);	\

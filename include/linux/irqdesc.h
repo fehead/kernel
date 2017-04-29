@@ -126,6 +126,10 @@ static inline struct msi_desc *irq_desc_get_msi_desc(struct irq_desc *desc)
  */
 static inline void generic_handle_irq_desc(unsigned int irq, struct irq_desc *desc)
 {
+/* IAMROOT-12 fehead (2017-04-29):
+ * --------------------------
+ * gic_handle_cascade_irq
+ */
 	desc->handle_irq(irq, desc);
 }
 

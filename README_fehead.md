@@ -396,6 +396,41 @@
 				irq_domain_alloc_irq_data
 						irq_domain_insert_irq_data
 						irq_domain_alloc_irqs_recursive
+gic_cascade_irq
+	irq_set_handler_data
+		
 
 
+```
+
+### 2017.04.29
+#### 참고
+- http://jake.dothome.co.kr/interrupts-2
+
+#### 진도
+- gic_of_init -> irq_of_parse_and_map
+```
+							gic_irq_domain_alloc
+								gic_irq_domain_xlate
+								gic_irq_domain_map
+									irq_set_percpu_devid
+						irq_domain_insert_irq
+		
+		irq_create_mapping
+			irq_domain_associate
+				gic_irq_domain_map
+		irq_get_trigger_type
+		irq_set_irq_type
+			__irq_set_trigger
+				gic_set_type
+				unmask_irq
+					gic_unmask_irq
+
+```
+
+- gic_handle_irq
+```
+	__handle_domain_irq
+		generic_handle_irq
+			generic_handle_irq_desc
 ```

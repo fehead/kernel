@@ -419,6 +419,10 @@ EXPORT_SYMBOL_GPL(generic_handle_irq);
  *
  * Returns:	0 on success, or -EINVAL if conversion has failed
  */
+/* IAMROOT-12 fehead (2017-04-29):
+ * --------------------------
+ * handle_IRQ -> __handle_domain_irq(NULL, irq, false, regs);
+ */
 int __handle_domain_irq(struct irq_domain *domain, unsigned int hwirq,
 			bool lookup, struct pt_regs *regs)
 {

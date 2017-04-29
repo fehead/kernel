@@ -330,6 +330,11 @@ void irq_enter(void)
 		 * Prevent raise_softirq from needlessly waking up ksoftirqd
 		 * here, as softirq will be serviced on return from interrupt.
 		 */
+		/* IAMROOT-12 fehead (2017-04-29):
+		 * --------------------------
+		 * softirq는 인터럽트로부터 돌아 왔을 때 raise_softirq가 불필요
+		 * 하게 ksoftirqd를 깨우는 것을 방지합니다.
+		 */
 		local_bh_disable();
 		tick_irq_enter();
 		_local_bh_enable();

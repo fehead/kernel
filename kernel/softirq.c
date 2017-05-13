@@ -53,6 +53,11 @@ irq_cpustat_t irq_stat[NR_CPUS] ____cacheline_aligned;
 EXPORT_SYMBOL(irq_stat);
 #endif
 
+/* IAMROOT-12 fehead (2017-05-13):
+ * --------------------------
+ * softirq_vec[TASKLET_SOFTIRQ] = tasklet_action
+ * softirq_vec[HI_SOFTIRQ] = tasklet_hi_action
+ */
 static struct softirq_action softirq_vec[NR_SOFTIRQS] __cacheline_aligned_in_smp;
 
 DEFINE_PER_CPU(struct task_struct *, ksoftirqd);
@@ -86,7 +91,16 @@ static void wakeup_softirqd(void)
  * This lets us distinguish between whether we are currently processing
  * softirq and whether we just have bh disabled.
  */
-
+/* IAMROOT-12 fehead (2017-05-13):
+ * --------------------------
+ * preempt_count 및 SOFTIRQ_OFFSET 사용법 :
+ * - preempt_count는 softirq 처리를 시작하거나 종료 할 때 SOFTIRQ_OFFSET에 의해
+ *  변경됩니다.
+ * - preempt_count는 local_bh_disable 또는 local_bh_enable에서
+ *  SOFTIRQ_DISABLE_OFFSET (= 2 * SOFTIRQ_OFFSET)에 의해 변경됩니다.
+ * 이것은 우리가 현재 softirq를 처리하고 있는지 여부와 bh가 비활성화되어 있는지
+ * 를 구분할 수있게 해준다.
+ */
 /*
  * This one is for softirq.c-internal use,
  * where hardirqs are disabled legitimately:
@@ -242,8 +256,18 @@ asmlinkage __visible void __do_softirq(void)
 	 * softirq. A softirq handled such as network RX might set PF_MEMALLOC
 	 * again if the socket is related to swap
 	 */
+	/* IAMROOT-12 fehead (2017-05-13):
+	 * --------------------------
+	 * PF_MEMALLOC을 마스크 아웃하십시오. 현재 태스크 컨텍스트가 softirq에
+	 * 빌려 있습니다. 소켓이 스왑과 관련된 경우 네트워크 RX와 같이 처리 된
+	 * softirq가 PF_MEMALLOC을 다시 설정할 수 있습니다.
+	 */
 	current->flags &= ~PF_MEMALLOC;
 
+	/* IAMROOT-12 fehead (2017-05-13):
+	 * --------------------------
+	 * pending = irq_stat[smp_processor_id()].__softirq_pending
+	 */
 	pending = local_softirq_pending();
 	account_irq_enter_time(current);
 
@@ -352,12 +376,22 @@ static inline void invoke_softirq(void)
 		 * it is the irq stack, because it should be near empty
 		 * at this stage.
 		 */
+		/* IAMROOT-12 fehead (2017-05-13):
+		 * --------------------------
+		 * irq 스택 인 경우 현재 스택에서 softirq를 안전하게 실행할 수
+		 * 있습니다.이 단계에서는이 스택이 거의 비어 있어야하기 때문입니다.
+		 */
 		__do_softirq();
 #else
 		/*
 		 * Otherwise, irq_exit() is called on the task stack that can
 		 * be potentially deep already. So call softirq in its own stack
 		 * to prevent from any overrun.
+		 */
+		/* IAMROOT-12 fehead (2017-05-13):
+		 * --------------------------
+		 * 그렇지 않으면 irq_exit()가 작업 스택에서 호출 될 수 있습니다.
+		 * 오버런을 방지하기 위해 자체 스택에 softirq를 호출하십시오.
 		 */
 		do_softirq_own_stack();
 #endif
@@ -435,6 +469,11 @@ void __raise_softirq_irqoff(unsigned int nr)
 	or_softirq_pending(1UL << nr);
 }
 
+/* IAMROOT-12 fehead (2017-05-13):
+ * --------------------------
+ * open_softirq(TASKLET_SOFTIRQ, tasklet_action);
+ * open_softirq(HI_SOFTIRQ, tasklet_hi_action);
+ */
 void open_softirq(int nr, void (*action)(struct softirq_action *))
 {
 	softirq_vec[nr].action = action;

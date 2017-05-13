@@ -7,6 +7,10 @@
 #ifdef CONFIG_TRACE_IRQFLAGS
 extern void __local_bh_disable_ip(unsigned long ip, unsigned int cnt);
 #else
+/* IAMROOT-12 fehead (2017-05-13):
+ * --------------------------
+ * 예) __local_bh_disable_ip(_RET_IP_, SOFTIRQ_OFFSET)
+ */
 static __always_inline void __local_bh_disable_ip(unsigned long ip, unsigned int cnt)
 {
 	preempt_count_add(cnt);

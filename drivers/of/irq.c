@@ -605,6 +605,10 @@ struct intc_desc {
  * -------------
  * 디바이스 트리와 매치된 최상위 인터럽트 컨트롤러부터 초기화 함수를 호출한다.
  */
+/* IAMROOT-12 fehead (2017-05-06):
+ * --------------------------
+ * of_irq_init(__irqchip_of_table);
+ */
 void __init of_irq_init(const struct of_device_id *matches)
 {
 	struct device_node *np, *parent = NULL;

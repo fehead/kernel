@@ -31,6 +31,11 @@
  *			__used __section(__irqchip_of_table)
  *			 = { .compatible = compat,				\
  *			     .data = fn }
+ * ex) IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
+ *	static const struct of_device_id __of_table_gic_400
+ *		__used __section(__irqchip_of_table)
+ *		 = { .compatible = "arm,gic-400",
+ *		     .data = gic_of_init }
  */
 #define IRQCHIP_DECLARE(name, compat, fn) OF_DECLARE_2(irqchip, name, compat, fn)
 

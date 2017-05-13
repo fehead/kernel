@@ -434,3 +434,35 @@ gic_cascade_irq
 		generic_handle_irq
 			generic_handle_irq_desc
 ```
+
+### 2017.05.06
+#### 참고
+- arch/arm/boot/dts/rk3288.dtsi arm,gic-400
+
+#### 진도
+- init_IRQ
+```
+of_irq_init
+```
+
+### 2017.05.13
+#### 참고
+- http://jake.dothome.co.kr/interrupts-2
+- http://jake.dothome.co.kr/two-part-interrupt-handler
+- http://jake.dothome.co.kr/softirq
+
+#### 진도
+- softirq_init
+```
+```
+
+- __do_soft_irq
+```
+	local_softirq_pending
+```
+
+- raise_softirq
+```
+	raise_softirq_irqoff
+		__raise_softirq_irqoff
+```

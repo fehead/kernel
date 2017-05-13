@@ -25,6 +25,13 @@ irqchip_of_match_end __used __section(__irqchip_of_table_end);
  * --------------------------
  * IRQCHIP_DECLARE 참고
  */
+/*
+ * ex) IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
+ *	static const struct of_device_id __of_table_gic_400
+ *		__used __section(__irqchip_of_table)
+ *		 = { .compatible = "arm,gic-400",
+ *		     .data = gic_of_init }
+ */
 extern struct of_device_id __irqchip_of_table[];
 
 void __init irqchip_init(void)

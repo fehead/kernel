@@ -853,7 +853,7 @@ void handle_percpu_devid_irq(unsigned int irq, struct irq_desc *desc)
  * -------------
  * ack 레지스터를 읽는 것으로 gic 컨트롤러에게 ack 신호를 보낸다.
  *
- *
+ * handle_fasteoi_irq() 함수와 다르게 ack 처리를 왜 여기서 할까요???
  */
 	/* IAMROOT-12 fehead (2017-04-29):
 	 * --------------------------

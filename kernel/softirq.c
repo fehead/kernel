@@ -103,7 +103,6 @@ static void wakeup_softirqd(void)
  * This lets us distinguish between whether we are currently processing
  * softirq and whether we just have bh disabled.
  */
-<<<<<<< HEAD
 /* IAMROOT-12 fehead (2017-05-13):
  * --------------------------
  * preempt_count 및 SOFTIRQ_OFFSET 사용법 :
@@ -114,16 +113,12 @@ static void wakeup_softirqd(void)
  * 이것은 우리가 현재 softirq를 처리하고 있는지 여부와 bh가 비활성화되어 있는지
  * 를 구분할 수있게 해준다.
  */
-=======
-
 /* IAMROOT-12:
  * -------------
  * SOFTIRQ_OFFSET 단위로 증가하는 경우 softirq 처리 중 여부를 가릴 수 있다.
  * local_bh_disable() 함수를 사용하는 경우에는 SOFTIRQ_OFFSET*2 단위로 
  * 증가하여 softirq 처리중 여부는 가릴 수 없다.
  */
-
->>>>>>> upstream/master
 /*
  * This one is for softirq.c-internal use,
  * where hardirqs are disabled legitimately:
@@ -285,20 +280,12 @@ asmlinkage __visible void __do_softirq(void)
 	 * softirq. A softirq handled such as network RX might set PF_MEMALLOC
 	 * again if the socket is related to swap
 	 */
-<<<<<<< HEAD
 	/* IAMROOT-12 fehead (2017-05-13):
 	 * --------------------------
 	 * PF_MEMALLOC을 마스크 아웃하십시오. 현재 태스크 컨텍스트가 softirq에
 	 * 빌려 있습니다. 소켓이 스왑과 관련된 경우 네트워크 RX와 같이 처리 된
 	 * softirq가 PF_MEMALLOC을 다시 설정할 수 있습니다.
 	 */
-	current->flags &= ~PF_MEMALLOC;
-
-	/* IAMROOT-12 fehead (2017-05-13):
-	 * --------------------------
-	 * pending = irq_stat[smp_processor_id()].__softirq_pending
-	 */
-=======
 /* IAMROOT-12:
  * -------------
  * 태스크에 PF_MEMALLOC 요청이 있는 경우 잠시 제거한다.
@@ -310,7 +297,10 @@ asmlinkage __visible void __do_softirq(void)
  * -------------
  * 현재 cpu에 대한 softirq 요청 비트들을 알아온다.
  */
->>>>>>> upstream/master
+	/* IAMROOT-12 fehead (2017-05-13):
+	 * --------------------------
+	 * pending = irq_stat[smp_processor_id()].__softirq_pending
+	 */
 	pending = local_softirq_pending();
 	account_irq_enter_time(current);
 
@@ -497,20 +487,17 @@ static inline void invoke_softirq(void)
 		 * it is the irq stack, because it should be near empty
 		 * at this stage.
 		 */
-<<<<<<< HEAD
 		/* IAMROOT-12 fehead (2017-05-13):
 		 * --------------------------
 		 * irq 스택 인 경우 현재 스택에서 softirq를 안전하게 실행할 수
 		 * 있습니다.이 단계에서는이 스택이 거의 비어 있어야하기 때문입니다.
 		 */
-=======
 
 /* IAMROOT-12:
  * -------------
  * 이미 irq 전용 스택을 사용하는 경우 곧바로 처리 루틴을 호출한다.
  * (이 상태에서는 거의 irq 전용 스택이 비어 있을것이다)
  */
->>>>>>> upstream/master
 		__do_softirq();
 #else
 		/*
@@ -518,13 +505,11 @@ static inline void invoke_softirq(void)
 		 * be potentially deep already. So call softirq in its own stack
 		 * to prevent from any overrun.
 		 */
-<<<<<<< HEAD
 		/* IAMROOT-12 fehead (2017-05-13):
 		 * --------------------------
 		 * 그렇지 않으면 irq_exit()가 작업 스택에서 호출 될 수 있습니다.
 		 * 오버런을 방지하기 위해 자체 스택에 softirq를 호출하십시오.
 		 */
-=======
 
 /* IAMROOT-12:
  * -------------
@@ -533,7 +518,6 @@ static inline void invoke_softirq(void)
  *
  * 그러나 arm 커널은 지원하는 함수가 없이 곧바로 __do_softirq()를 호출한다.
  */
->>>>>>> upstream/master
 		do_softirq_own_stack();
 #endif
 	} else {

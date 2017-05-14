@@ -456,7 +456,7 @@ of_irq_init
 ```
 ```
 
-- __do_soft_irq
+- __do_softirq
 ```
 	local_softirq_pending
 ```

@@ -65,6 +65,23 @@ extern struct tvec_base boot_tvec_bases;
  * workqueue locking issues. It's not meant for executing random crap
  * with interrupts disabled. Abuse is monitored!
  */
+/* IAMROOT-12 fehead (2017-05-20):
+ * --------------------------
+ * 모든 tvec_base는 timer_list에서 최소한 4 바이트 정렬되고 하위 2 비트가 0으로
+ * 보장됩니다. 플래그로 사용하십시오.
+ *
+ * 지연 가능한 타이머는 시스템이 사용 중일 때 정상적으로 작동하지만 CPU를 서비스
+ * 하기 위해 유휴 상태가되지 않도록합니다. 대신에 CPU가 결국 후속 비 연기 가능한
+ * 타이머로 깨어날 때 타이머가 서비스됩니다.
+ *
+ * IRQ가 비활성화 된 상태에서 irqsafe 타이머가 실행되며, 예를 들어
+ * del_timer_sync ()를 호출하여 IRQ 처리기에서 실행중인 인스턴스가 완료 될 때까
+ * 지 기다리는 것이 안전합니다.
+ *
+ * 참고 : irq 비활성화 콜백 실행은 작업 잠금 문제에 특별한 경우입니다. 인터럽트
+ * 가 비활성화 된 임의의 쓰레기 실행을위한 것이 아닙니다.
+ * 악용 사례가 모니터링됩니다.
+ */
 #define TIMER_DEFERRABLE		0x1LU
 #define TIMER_IRQSAFE			0x2LU
 

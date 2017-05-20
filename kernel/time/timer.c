@@ -758,6 +758,11 @@ static struct tvec_base *lock_timer_base(struct timer_list *timer,
 	}
 }
 
+/* IAMROOT-12 fehead (2017-05-20):
+ * --------------------------
+ * add_timer -> mod_timer ->
+ *	__mod_timer(timer, expires, false, TIMER_NOT_PINNED);
+ */
 static inline int
 __mod_timer(struct timer_list *timer, unsigned long expires,
 						bool pending_only, int pinned)

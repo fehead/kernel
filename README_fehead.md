@@ -466,3 +466,26 @@ of_irq_init
 	raise_softirq_irqoff
 		__raise_softirq_irqoff
 ```
+
+### 2017.05.20
+#### 참고
+- http://jake.dothome.co.kr/ipi-cross-call/
+- http://jake.dothome.co.kr/lowrestimer/
+
+#### 진도
+- smp_call_function_many
+- smp_cross_call
+- do_IPI -> handle_IPI
+```
+	tick_receive_broadcast
+	generic_smp_call_function_interrupt
+```
+
+- init_timers - timer_cpu_notify - init_timers_cpu
+- add_timer
+```
+	mod_timer
+		apply_slack
+		timer_pending
+		detach_if_pending
+```

@@ -590,6 +590,11 @@ void resched_cpu(int cpu)
  * selecting an idle cpu will add more delays to the timers than intended
  * (as that cpu's timer base may not be uptodate wrt jiffies etc).
  */
+/* IAMROOT-12 fehead (2017-05-29):
+ * --------------------------
+ * __mod_timer(timer, expires, false, TIMER_NOT_PINNED);
+ *	-> get_nohz_timer_target(TIMER_NOT_PINNED)
+ */
 int get_nohz_timer_target(int pinned)
 {
 	int cpu = smp_processor_id();

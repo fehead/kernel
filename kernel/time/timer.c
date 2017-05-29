@@ -813,6 +813,10 @@ void init_timer_key(struct timer_list *timer, unsigned int flags,
 }
 EXPORT_SYMBOL(init_timer_key);
 
+/* IAMROOT-12 fehead (2017-05-29):
+ * --------------------------
+ * detach_if_pending -> detach_timer(timer, false)
+ */
 static inline void detach_timer(struct timer_list *timer, bool clear_pending)
 {
 	struct list_head *entry = &timer->entry;
@@ -849,6 +853,12 @@ detach_expired_timer(struct timer_list *timer, struct tvec_base *base)
 	(void)catchup_timer_jiffies(base);
 }
 
+/* IAMROOT-12 fehead (2017-05-29):
+ * --------------------------
+ * add_timer -> mod_timer ->
+ *	__mod_timer(timer, expires, false, TIMER_NOT_PINNED) ->
+ *		detach_if_pending(timer, base, false);
+ */
 static int detach_if_pending(struct timer_list *timer, struct tvec_base *base,
 			     bool clear_pending)
 {

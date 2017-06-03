@@ -487,5 +487,21 @@ of_irq_init
 	mod_timer
 		apply_slack
 		timer_pending
-		detach_if_pending
+		__mod_timer
+			detach_if_pending
+```
+
+### 2017.05.27
+#### 참고
+
+#### 진도
+- add_timer -> mod_timer -> __mod_timer
+```
+			get_nohz_timer_target
+			internal_add_timer
+				__internal_add_timer
+```
+- run_timer_softirq -> __run_timers
+```
+	cascade
 ```

@@ -1142,6 +1142,10 @@ remove_hrtimer(struct hrtimer *timer, struct hrtimer_clock_base *base)
 	return 0;
 }
 
+/* IAMROOT-12 fehead (2017-06-09):
+ * --------------------------
+ * hrtimer_start -> __hrtimer_start_range_ns(timer, tim, 0, mode, 1);
+ */
 int __hrtimer_start_range_ns(struct hrtimer *timer, ktime_t tim,
 		unsigned long delta_ns, const enum hrtimer_mode mode,
 		int wakeup)

@@ -783,6 +783,19 @@ static void __init arch_timer_common_init(void)
  * armv7 내장 local 타이머 초기화
  * (cpu당 4개의 h/w 타이머가 있고 리눅스 커널은 그 중 하나를 사용한다.)
  */
+/* IAMROOT-12 fehead (2017-06-12):
+ * --------------------------
+ * bcm2709.dtsi 참고.
+ * np = timer {
+ *	compatible = "arm,armv7-timer";
+ * 	clock-frequency = <19200000>;
+ * 	interrupts = <3 0>, // PHYS_SECURE_PPI
+ *		<3 1>, // PHYS_NONSECURE_PPI
+ * 		<3 3>, // VIRT_PPI
+ * 		<3 2>; // HYP_PPI
+ * 	always-on;
+ * };
+ */
 static void __init arch_timer_init(struct device_node *np)
 {
 	int i;

@@ -213,6 +213,12 @@ void cpu_hotplug_enable(void)
 #endif	/* CONFIG_HOTPLUG_CPU */
 
 /* Need to know about CPUs going up/down? */
+/* IAMROOT-12 fehead (2017-06-16):
+ * --------------------------
+ * static struct notifier_block arch_timer_cpu_nb = {
+ * 	.notifier_call = arch_timer_cpu_notify,
+ * };
+ */
 int __ref register_cpu_notifier(struct notifier_block *nb)
 {
 	int ret;

@@ -444,6 +444,11 @@ void clockevents_config(struct clock_event_device *dev, u32 freq)
  *
  * min/max_delta can be 0 for devices which do not support oneshot mode.
  */
+/* IAMROOT-12 fehead (2017-06-16):
+ * --------------------------
+ * __arch_timer_setup ->
+ *	clockevents_config_and_register(clk, arch_timer_rate, 0xf, 0x7fffffff);
+ */
 void clockevents_config_and_register(struct clock_event_device *dev,
 				     u32 freq, unsigned long min_delta,
 				     unsigned long max_delta)

@@ -57,6 +57,11 @@
  * reduce the conversion accuracy by chosing smaller mult and shift
  * factors.
  */
+/* IAMROOT-12 fehead (2017-06-16):
+ * --------------------------
+ * clockevents_calc_mult_shift ->
+ *   clocks_calc_mult_shift(&ce->mult, &ce->shift, NSEC_PER_SEC, freq, minsec);
+ */
 void
 clocks_calc_mult_shift(u32 *mult, u32 *shift, u32 from, u32 to, u32 maxsec)
 {

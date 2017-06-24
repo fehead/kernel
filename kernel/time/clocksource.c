@@ -537,6 +537,10 @@ u64 clocks_calc_max_nsecs(u32 mult, u32 shift, u32 maxadj, u64 mask)
  * @cs:         Pointer to clocksource
  *
  */
+/* IAMROOT-12 fehead (2017-06-24):
+ * --------------------------
+ * clocksource가 연기 될 수있는 최대 시간을 반환합니다.
+ */
 static u64 clocksource_max_deferment(struct clocksource *cs)
 {
 	u64 max_nsecs;
@@ -693,6 +697,12 @@ static void clocksource_enqueue(struct clocksource *cs)
  * This *SHOULD NOT* be called directly! Please use the
  * clocksource_updatefreq_hz() or clocksource_updatefreq_khz helper functions.
  */
+/* IAMROOT-12 fehead (2017-06-24):
+ * --------------------------
+ * clocksource_register_hz(&clocksource_counter, arch_timer_rate) ->
+ *	__clocksource_register_scale(cs, 1, hz) ->
+ *	__clocksource_updatefreq_scale(cs, 1, hz)
+ */
 void __clocksource_updatefreq_scale(struct clocksource *cs, u32 scale, u32 freq)
 {
 	u64 sec;
@@ -780,6 +790,11 @@ EXPORT_SYMBOL_GPL(__clocksource_updatefreq_scale);
  *
  * This *SHOULD NOT* be called directly! Please use the
  * clocksource_register_hz() or clocksource_register_khz helper functions.
+ */
+/* IAMROOT-12 fehead (2017-06-24):
+ * --------------------------
+ * clocksource_register_hz(&clocksource_counter, arch_timer_rate) ->
+ *	__clocksource_register_scale(cs, 1, hz);
  */
 int __clocksource_register_scale(struct clocksource *cs, u32 scale, u32 freq)
 {

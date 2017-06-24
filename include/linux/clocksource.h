@@ -202,6 +202,10 @@ __clocksource_register_scale(struct clocksource *cs, u32 scale, u32 freq);
 extern void
 __clocksource_updatefreq_scale(struct clocksource *cs, u32 scale, u32 freq);
 
+/* IAMROOT-12 fehead (2017-06-24):
+ * --------------------------
+ * clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+ */
 static inline int clocksource_register_hz(struct clocksource *cs, u32 hz)
 {
 	return __clocksource_register_scale(cs, 1, hz);

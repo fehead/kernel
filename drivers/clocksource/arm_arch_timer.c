@@ -470,6 +470,11 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
 
 static void arch_timer_banner(unsigned type)
 {
+/* IAMROOT-12 fehead (2017-06-22):
+ * --------------------------
+ * pi2	linux kernel ver 4.1.17 log
+ *	Architected cp15 timer(s) running at 19.20MHz (phys).
+ */
 	pr_info("Architected %s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
 		     type & ARCH_CP15_TIMER ? "cp15" : "",
 		     type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
@@ -575,6 +580,10 @@ static void __init arch_counter_register(unsigned type)
 /* IAMROOT-12:
  * -------------
  * 이 시점의 카운터를 읽어온다.
+ */
+/* IAMROOT-12 fehead (2017-06-24):
+ * --------------------------
+ * arch_timer_read_counter = arch_counter_get_cntvct or arch_counter_get_cntpct
  */
 	start_count = arch_timer_read_counter();
 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);

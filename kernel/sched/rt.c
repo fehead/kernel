@@ -11,6 +11,15 @@ int sched_rr_timeslice = RR_TIMESLICE;
 
 static int do_sched_rt_period_timer(struct rt_bandwidth *rt_b, int overrun);
 
+/* IAMROOT-12 fehead (2017-07-10):
+ * --------------------------
+ * def_rt_bandwidth
+ *	.rt_period = 1sec
+ *	.rt_runtime = 0.95sec
+ *	.rt_period_timer.function = sched_rt_period_timer
+ *	.rt_period_timer.base = hrtimer_bases[HRTIMER_BASE_MONOTONIC]
+ * 	.rt_period_timer.node = timerqueue_init()
+ */
 struct rt_bandwidth def_rt_bandwidth;
 
 static enum hrtimer_restart sched_rt_period_timer(struct hrtimer *timer)
@@ -34,6 +43,14 @@ static enum hrtimer_restart sched_rt_period_timer(struct hrtimer *timer)
 	return idle ? HRTIMER_NORESTART : HRTIMER_RESTART;
 }
 
+/* IAMROOT-12 fehead (2017-07-10):
+ * --------------------------
+ * rt_b->rt_period = period
+ * rt_b->rt_runtime = runtime
+ * rt_b->rt_period_timer.function = sched_rt_period_timer
+ * rt_b->rt_period_timer.base = hrtimer_bases[HRTIMER_BASE_MONOTONIC]
+ * rt_b->rt_period_timer.node = timerqueue_init()
+ */
 void init_rt_bandwidth(struct rt_bandwidth *rt_b, u64 period, u64 runtime)
 {
 	rt_b->rt_period = ns_to_ktime(period);

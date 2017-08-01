@@ -205,6 +205,14 @@ void cpupri_set(struct cpupri *cp, int cpu, int newpri)
  *
  * Return: -ENOMEM on memory allocation failure.
  */
+/* IAMROOT-12 fehead (2017-07-10):
+ * --------------------------
+ * cp->pri_to_cpu[0..]
+ *	.count = 0
+ *	.mask = zalloc_cpumask_var()
+ *	.cpu_to_pri = kcalloc(nr_cpu_ids, ...)
+ *		[0..] = CPUPRI_INVALID
+ */
 int cpupri_init(struct cpupri *cp)
 {
 	int i;

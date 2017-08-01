@@ -10,6 +10,10 @@
 #include <linux/export.h>
 
 unsigned int __read_mostly sysctl_sched_autogroup_enabled = 1;
+/* IAMROOT-12 fehead (2017-07-11):
+ * --------------------------
+ * autogroup_default.tg = &root_task_group
+ */
 static struct autogroup autogroup_default;
 static atomic_t autogroup_seq_nr;
 

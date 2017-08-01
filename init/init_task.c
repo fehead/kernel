@@ -23,6 +23,10 @@ static struct sighand_struct init_sighand = INIT_SIGHAND(init_sighand);
  * 교체하는 작업을 수행하여 왔기 때문에 이 이름을 사용하고 있지만
  * 지금은 커널 셋업이 된 후에 영원히 sleep 된다.
  */
+/* IAMROOT-12 fehead (2017-07-11):
+ * --------------------------
+ * init_task.signal->autogroup = &autogroup_default;
+ */
 struct task_struct init_task = INIT_TASK(init_task);
 EXPORT_SYMBOL(init_task);
 

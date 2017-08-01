@@ -5291,6 +5291,18 @@ static void set_rq_online(struct rq *rq)
 		cpumask_set_cpu(rq->cpu, rq->rd->online);
 		rq->online = 1;
 
+		/* IAMROOT-12 fehead (2017-07-13):
+		 * --------------------------
+		 * for (class = sched_class_highest; class; class = class->next)
+		 *
+		 * stop_sched_class->next = &dl_sched_class
+		 * dl_sched_class->next = &rt_sched_class
+		 * rt_sched_class->next = &fair_sched_class
+		 * fair_sched_class->next = &idle_sched_class
+		 * idle_sched_class->next = null
+		 *
+		 * rq_online_dl, rq_online_rt, rq_online_fair 함수 호출.
+		 */
 		for_each_class(class) {
 			if (class->rq_online)
 				class->rq_online(rq);
@@ -5693,6 +5705,25 @@ static void rq_attach_root(struct rq *rq, struct root_domain *rd)
 		call_rcu_sched(&old_rd->rcu, free_rootdomain);
 }
 
+/* IAMROOT-12 fehead (2017-07-10):
+ * --------------------------
+ * rd
+ *	->span = alloc_cpumask_var()
+ *	->online = alloc_cpumask_var()
+ *	->dlo_mask = alloc_cpumask_var()
+ *	->rto_mask = alloc_cpumask_var()
+ *	->dl_bw.bw = 95%
+ *	->dl_bw.total_bw = 0
+ *	->cpudl.size = 0
+ *	->cpudl.elements = kcalloc(nr_cpu_ids ..)
+ *	->       [0..].idx = IDX_INVALID
+ *	->cpudl.freecpus = zalloc_cpumask_var()
+ *	->cpupri.pri_to_cpu[0..]
+ *		.count = 0
+ *		.mask = zalloc_cpumask_var()
+ *		.cpu_to_pri = kcalloc(nr_cpu_ids, ...)
+ *			[0..] = CPUPRI_INVALID
+ */
 static int init_rootdomain(struct root_domain *rd)
 {
 	memset(rd, 0, sizeof(*rd));
@@ -5738,6 +5769,26 @@ out:
 /*
  * By default the system creates a single root-domain with all cpus as
  * members (mimicking the global state we have today).
+ */
+/* IAMROOT-12 fehead (2017-07-10):
+ * --------------------------
+ * def_root_domain
+ *	.span = alloc_cpumask_var()
+ *	.online = alloc_cpumask_var()
+ *	.dlo_mask = alloc_cpumask_var()
+ *	.rto_mask = alloc_cpumask_var()
+ *	.dl_bw.bw = 95%
+ *	.dl_bw.total_bw = 0
+ *	.cpudl.size = 0
+ *	.cpudl.elements = kcalloc(nr_cpu_ids ..)
+ *		[0..].idx = IDX_INVALID
+ *	.cpudl.freecpus = zalloc_cpumask_var()
+ *	.cpupri.pri_to_cpu[0..]
+ *		.count = 0
+ *		.mask = zalloc_cpumask_var()
+ *		.cpu_to_pri = kcalloc(nr_cpu_ids, ...)
+ *			[0..] = CPUPRI_INVALID
+ *	.refcount = 1
  */
 struct root_domain def_root_domain;
 
@@ -7173,6 +7224,15 @@ int in_sched_functions(unsigned long addr)
  * Default task group.
  * Every task in system belongs to this group at bootup.
  */
+/* IAMROOT-12 fehead (2017-07-11):
+ * --------------------------
+ * root_task_group.rt_bandwidth
+ *	.rt_period = period
+ *	.rt_runtime = runtime
+ *	.rt_period_timer.function = sched_rt_period_timer
+ *	.rt_period_timer.base = hrtimer_bases[HRTIMER_BASE_MONOTONIC]
+ *	.rt_period_timer.node = timerqueue_init()
+ */
 struct task_group root_task_group;
 LIST_HEAD(task_groups);
 #endif
@@ -7248,7 +7308,6 @@ void __init sched_init(void)
 #ifdef CONFIG_SMP
 	init_defrootdomain();
 #endif
-
 /* IAMROOT-12:
  * -------------
  * 루트 태스크 그룹용 rt 대역폭 초기화
@@ -7308,6 +7367,25 @@ void __init sched_init(void)
 		 *
 		 * We achieve this by letting root_task_group's tasks sit
 		 * directly in rq->cfs (i.e root_task_group->se[] = NULL).
+		 */
+		/* IAMROOT-12 fehead (2017-07-11):
+		 * --------------------------
+		 * root_task_group의 CPU 대역폭은 얼마나됩니까?
+		 *
+		 * 작업 그룹이 cgroup 파일 시스템을 구성하면 시스템의 CPU 자원이
+		 * 100 %가됩니다. 이 전체 시스템 CPU 자원은 각 엔티티 (태스크 또
+		 * 는 태스크 그룹)의 가중치 (se-> load.weight)를 기반으로
+		 * root_task_group 및 그 하위 타스크 그룹의 태스크간에 공정한
+		 * 방식으로 나누어집니다.
+		 *
+		 * 다시 말해, root_task_group에 1024의 가중치를 가진 10개의 태스
+		 * 크 작업과 두 개의 하위 그룹 A0 및 A1 (각각 1024 개의 가중치)
+		 * 이있는 경우 A0의 CPU 자원 점유율은 다음과 같습니다.
+		 *
+		 *	A0의 대역폭 = 1024 / (10*1024 + 1024 + 1024) = 8.33%
+		 *
+		 * 우리는 root_task_group의 작업을 rq-> cfs (즉, root_task_group
+		 * ->se[] = NULL)에 직접 두어이 작업을 수행합니다.
 		 */
 		init_cfs_bandwidth(&root_task_group.cfs_bandwidth);
 		init_tg_cfs_entry(&root_task_group, &rq->cfs, NULL, i, NULL);

@@ -1001,11 +1001,19 @@ extern bool numabalancing_enabled;
 #define numabalancing_enabled (0)
 #endif /* CONFIG_NUMA_BALANCING */
 
+/* IAMROOT-12 fehead (2017-07-10):
+ * --------------------------
+ * 1sec : real time scheduler 주기
+ */
 static inline u64 global_rt_period(void)
 {
 	return (u64)sysctl_sched_rt_period * NSEC_PER_USEC;
 }
 
+/* IAMROOT-12 fehead (2017-07-10):
+ * --------------------------
+ * 0.95sec : real time scheduler 실행시간.
+ */
 static inline u64 global_rt_runtime(void)
 {
 	if (sysctl_sched_rt_runtime < 0)
@@ -1225,6 +1233,14 @@ static inline void put_prev_task(struct rq *rq, struct task_struct *prev)
 	prev->sched_class->put_prev_task(rq, prev);
 }
 
+/* IAMROOT-12 fehead (2017-07-13):
+ * --------------------------
+ * stop_sched_class->next = &dl_sched_class
+ * dl_sched_class->next = &rt_sched_class
+ * rt_sched_class->next = &fair_sched_class
+ * fair_sched_class->next = &idle_sched_class
+ * idle_sched_class->next = null
+ */
 #define sched_class_highest (&stop_sched_class)
 #define for_each_class(class) \
    for (class = sched_class_highest; class; class = class->next)

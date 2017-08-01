@@ -136,6 +136,10 @@ out:
  */
 void cpudl_set(struct cpudl *cp, int cpu, u64 dl, int is_valid)
 {
+/* IAMROOT-12 fehead (2017-07-13):
+ * --------------------------
+ * 여기까지 ==========
+ */
 	int old_idx, new_cpu;
 	unsigned long flags;
 
@@ -209,6 +213,13 @@ void cpudl_clear_freecpu(struct cpudl *cp, int cpu)
 /*
  * cpudl_init - initialize the cpudl structure
  * @cp: the cpudl max-heap context
+ */
+/* IAMROOT-12 fehead (2017-07-10):
+ * --------------------------
+ * cp->size = 0
+ * cp->elements = kcalloc(nr_cpu_ids ..)
+ *	[0..].idx = IDX_INVALID
+ * cp->freecpus = zalloc_cpumask_var()
  */
 int cpudl_init(struct cpudl *cp)
 {

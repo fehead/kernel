@@ -18,6 +18,12 @@
 
 #include <linux/slab.h>
 
+/* IAMROOT-12 fehead (2017-07-10):
+ * --------------------------
+ * def_dl_bandwidth
+ *	.period = 1sec
+ *	.dl_runtime = 0.95s
+ */
 struct dl_bandwidth def_dl_bandwidth;
 
 static inline struct task_struct *dl_task_of(struct sched_dl_entity *dl_se)
@@ -57,6 +63,11 @@ void init_dl_bandwidth(struct dl_bandwidth *dl_b, u64 period, u64 runtime)
 	dl_b->dl_runtime = runtime;
 }
 
+/* IAMROOT-12 fehead (2017-07-10):
+ * --------------------------
+ * dl_b->dl_bw.bw = 95%
+ * dl_b->dl_bw.total_bw = 0
+ */
 void init_dl_bw(struct dl_bw *dl_b)
 {
 	raw_spin_lock_init(&dl_b->lock);

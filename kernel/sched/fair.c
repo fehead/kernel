@@ -186,6 +186,13 @@ static void __update_inv_weight(struct load_weight *lw)
 {
 	unsigned long w;
 
+/* IAMROOT-12:
+ * -------------
+ * 이미 inv_weight가 산출된 경우 함수를 빠져나간다.
+ *
+ * lw.inv_weight = 0xffff_ffff / lw.weight (WMULT_SHIFT(32)를 사용할 예정)
+ * (lw.inv_wieght = 2^32 / lw.weight와 거의 동일)
+ */
 	if (likely(lw->inv_weight))
 		return;
 
@@ -211,13 +218,41 @@ static void __update_inv_weight(struct load_weight *lw)
  * Or, weight =< lw.weight (because lw.weight is the runqueue weight), thus
  * weight/lw.weight <= 1, and therefore our shift will also be positive.
  */
+
+/* IAMROOT-12:
+ * -------------
+ * delta_exec(time_slice) * 1024 / lw.weight 
+ *
+ * 예) delta_exec=3000000(ns),  nice=-1인 경우 반환되는 vruntime은?
+ *	nice=-1인 경우 lw.weight=1277
+ *	3000000 * 1024 / 1277 = 약 2.4ms
+ *
+ * 예) delta_exec=3ms,  nice=1인 경우 반환되는 vruntime은?
+ *	nice=1인 경우 lw.weight=820
+ *	3000000 * 1024 / 820 = 약 3.74ms
+ */
 static u64 __calc_delta(u64 delta_exec, unsigned long weight, struct load_weight *lw)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * 추후 커널에서 64bit 시스템들은 scale이 반영되어 2^10만큼 더 작아진다.
+ */
 	u64 fact = scale_load_down(weight);
 	int shift = WMULT_SHIFT;
 
+/* IAMROOT-12:
+ * -------------
+ * 예) lw.weight=1277 -> lw.inv_weight=0xffff_ffff/1277 = 0x3351fd
+ * 예) lw.weight=820  -> lw.inv_weight=0xffff_ffff/820  = 0x4fec04
+ *
+ */
 	__update_inv_weight(lw);
 
+/* IAMROOT-12:
+ * -------------
+ * weight가 0x1_0000_0000 보다 큰 경우에만 수행한다.
+ */
 	if (unlikely(fact >> 32)) {
 		while (fact >> 32) {
 			fact >>= 1;
@@ -225,14 +260,33 @@ static u64 __calc_delta(u64 delta_exec, unsigned long weight, struct load_weight
 		}
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * 0x400 * 0x3341fd =   0xcd47_f400
+ * 0x400 * 0x4fec04 = 0x1_3fb0_1000
+ */
+
 	/* hint to use a 32x32->64 mul */
 	fact = (u64)(u32)fact * lw->inv_weight;
 
+/* IAMROOT-12:
+ * -------------
+ * overflow 때문에 정확도를 줄인다.
+ *
+ *   0xcd47_f400 -> 0xcd47_f400, shift=32
+ * 0x1_3fb0_1000 -> 0x9fd8_0800, shift=31
+ */
 	while (fact >> 32) {
 		fact >>= 1;
 		shift--;
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * = delta_exec * fact >> shift 
+ * 3000000 * 0xcd47_f400 >> 32 = 2405637 (ns)
+ * 3000000 * 0x9fd8_0800 >> 31 = 3746340 (ns)
+ */
 	return mul_u64_u32_shr(delta_exec, fact, shift);
 }
 
@@ -252,6 +306,12 @@ static inline struct rq *rq_of(struct cfs_rq *cfs_rq)
 }
 
 /* An entity is a task if it doesn't "own" a runqueue */
+
+/* IAMROOT-12:
+ * -------------
+ * 스케줄 엔티티가 태스크용인지 태스크그룹인지 구분을 하는데 
+ * 태스크용인 경우에는 se->my_q에 null로 되어 있다.
+ */
 #define entity_is_task(se)	(!se->my_q)
 
 static inline struct task_struct *task_of(struct sched_entity *se)
@@ -461,6 +521,15 @@ static inline int entity_before(struct sched_entity *a,
 
 static void update_min_vruntime(struct cfs_rq *cfs_rq)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * 현재 cfs 런큐에서 동작중인 스케줄 엔티티(curr + rb trees)의 vruntime중 
+ * 가장 작은 값으로 갱신한다.
+ *
+ * vruntime들은 계속하여 forward되기 때문에 min_vruntime도 계속 forward되는 
+ * 특징을 가진다.
+ */
 	u64 vruntime = cfs_rq->min_vruntime;
 
 	if (cfs_rq->curr)
@@ -600,6 +669,18 @@ int sched_proc_update_handler(struct ctl_table *table, int write,
  */
 static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * nice 0가 아닌 스케줄 엔티티인 경우에만 delta를 산출한다.
+ *
+ * time slice를 vruntime으로 변환하는 경우 nice-0인 스케줄 엔티티는 
+ * time slice가 그대로 vruntime으로 산출된다. 
+ *
+ * nice가 0이 아닌 경우에는 time slice * 1024 * inv_weight >> 32 
+ *
+ * 예) delta=3000000, se->load.weight=820(nice=1) -> 3746340(ns)
+ */
 	if (unlikely(se->load.weight != NICE_0_LOAD))
 		delta = __calc_delta(delta, NICE_0_LOAD, &se->load);
 
@@ -699,6 +780,10 @@ static void update_curr(struct cfs_rq *cfs_rq)
 	if (unlikely(!curr))
 		return;
 
+/* IAMROOT-12:
+ * -------------
+ * 현재 스케줄 엔티티의 delta 실행시각을 구한다. 
+ */
 	delta_exec = now - curr->exec_start;
 	if (unlikely((s64)delta_exec <= 0))
 		return;
@@ -708,20 +793,55 @@ static void update_curr(struct cfs_rq *cfs_rq)
 	schedstat_set(curr->statistics.exec_max,
 		      max(delta_exec, curr->statistics.exec_max));
 
+/* IAMROOT-12:
+ * -------------
+ * 스케줄 엔티티에 대해 총 실행 시간을 갱신한다.
+ */
 	curr->sum_exec_runtime += delta_exec;
 	schedstat_add(cfs_rq, exec_clock, delta_exec);
 
+/* IAMROOT-12:
+ * -------------
+ * delta_exec(time slice)를 사용하여 curr의 weight에 대한 vruntime 값을
+ * 산출한다.
+ *
+ * 예) delta_exec=3000000, curr->load.weight=820(nice=1) -> 3746340
+ */
 	curr->vruntime += calc_delta_fair(delta_exec, curr);
+
+/* IAMROOT-12:
+ * -------------
+ * cfs_rq->min_vruntime을 갱신한다.
+ */
 	update_min_vruntime(cfs_rq);
 
+/* IAMROOT-12:
+ * -------------
+ * 태스크에 대한 스케줄 엔티티만 해당한다.
+ */
 	if (entity_is_task(curr)) {
 		struct task_struct *curtask = task_of(curr);
 
 		trace_sched_stat_runtime(curtask, delta_exec, curr->vruntime);
+
+/* IAMROOT-12:
+ * -------------
+ * 태스크 그룹별 cpuusage에 실행 시각을 누적시킨다.
+ * ("/sys/fs/cgroup/cpuacct/cpuacct.usage")
+ */
 		cpuacct_charge(curtask, delta_exec);
+
+/* IAMROOT-12:
+ * -------------
+ * cputimer에 실행 시각을 누적시킨다.
+ */
 		account_group_exec_runtime(curtask, delta_exec);
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * cfs bandwidth 처리를 수행한다.
+ */
 	account_cfs_rq_runtime(cfs_rq, delta_exec);
 }
 
@@ -2422,8 +2542,18 @@ static __always_inline u64 decay_load(u64 val, u64 n)
 {
 	unsigned int local_n;
 
+/* IAMROOT-12:
+ * -------------
+ * n이 0이면 decay할 필요가 없다.
+ */
 	if (!n)
 		return val;
+
+/* IAMROOT-12:
+ * -------------
+ * LOAD_AVG_PERIOD(32) * 63 = 2016(ms) 
+ * 약 2초가 지나면 decay한 값은 0이다. 
+ */
 	else if (unlikely(n > LOAD_AVG_PERIOD * 63))
 		return 0;
 
@@ -2437,6 +2567,11 @@ static __always_inline u64 decay_load(u64 val, u64 n)
 	 *
 	 * To achieve constant time decay_load.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * 32ms 단위로 반절씩 줄어든다.
+ */
 	if (unlikely(local_n >= LOAD_AVG_PERIOD)) {
 		val >>= local_n / LOAD_AVG_PERIOD;
 		local_n %= LOAD_AVG_PERIOD;
@@ -2458,12 +2593,27 @@ static u32 __compute_runnable_contrib(u64 n)
 {
 	u32 contrib = 0;
 
+/* IAMROOT-12:
+ * -------------
+ * 32ms 이하는 곧바로 decay sum을 찾아서 반환한다.
+ */
 	if (likely(n <= LOAD_AVG_PERIOD))
 		return runnable_avg_yN_sum[n];
+
+/* IAMROOT-12:
+ * -------------
+ * 345ms를 초과하는 경우 최대 값 47742를 반환한다.
+ */
 	else if (unlikely(n >= LOAD_AVG_MAX_N))
 		return LOAD_AVG_MAX;
 
 	/* Compute \Sum k^n combining precomputed values for k^i, \Sum k^j */
+
+/* IAMROOT-12:
+ * -------------
+ * n=33ms -> 23371 * 0.978 + 1002 = 
+ * n=63ms -> 23371 * 0.51  + 22859 = 
+ */
 	do {
 		contrib /= 2; /* y^LOAD_AVG_PERIOD = 1/2 */
 		contrib += runnable_avg_yN_sum[LOAD_AVG_PERIOD];
@@ -2511,11 +2661,21 @@ static __always_inline int __update_entity_runnable_avg(u64 now,
 	u32 runnable_contrib;
 	int delta_w, decayed = 0;
 
+/* IAMROOT-12:
+ * -------------
+ * 현재 시각과 최종 계산했던 러너블 로드와의 차이를 delta에 대입한다.
+ */
 	delta = now - sa->last_runnable_update;
 	/*
 	 * This should only happen when time goes backwards, which it
 	 * unfortunately does during sched clock init when we swap over to TSC.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * 현재 시각이 뒤로 가는 경우가 x86의 TSC 클럭으로 전환되면서 발생하는 
+ * 케이스가 있다. 이러한 경우에는 러너블 로드를 산출하지 않는다.
+ */
 	if ((s64)delta < 0) {
 		sa->last_runnable_update = now;
 		return 0;
@@ -2525,13 +2685,34 @@ static __always_inline int __update_entity_runnable_avg(u64 now,
 	 * Use 1024ns as the unit of measurement since it's a reasonable
 	 * approximation of 1us and fast to compute.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * (ns) 단위를 (us) 단위로 바꾼다.
+ */
 	delta >>= 10;
 	if (!delta)
 		return 0;
+
+/* IAMROOT-12:
+ * -------------
+ * 현재시각을 러너블 로드 산출이 완료된 것으로 가정하고 대입한다.
+ */
 	sa->last_runnable_update = now;
 
 	/* delta_w is the amount already accumulated against our next period */
+
+/* IAMROOT-12:
+ * -------------
+ * 기존 값의 us 단위의 잔량만을 가져온다.
+ */
 	delta_w = sa->runnable_avg_period % 1024;
+
+/* IAMROOT-12:
+ * -------------
+ * delta(us)와 기존 러너블 평균에 사용한 기간(us)을 더한 값이 1024us(1ms)를 
+ * 초과하는 경우 이에 대한 decay를 수행한다.
+ */
 	if (delta + delta_w >= 1024) {
 		/* period roll-over */
 		decayed = 1;
@@ -2541,23 +2722,43 @@ static __always_inline int __update_entity_runnable_avg(u64 now,
 		 * out how much from delta we need to complete the current
 		 * period and accrue it.
 		 */
+
+/* IAMROOT-12:
+ * -------------
+ * 기존 값의 잔량을 채워서 1개 기간(period)을 채운다.
+ */
 		delta_w = 1024 - delta_w;
 		if (runnable)
 			sa->runnable_avg_sum += delta_w;
 		sa->runnable_avg_period += delta_w;
 
+/* IAMROOT-12:
+ * -------------
+ * 위에서 1024us에 해당하는 기간에 사용한 빌린 delta_w 기간을 delta에서 
+ * 뺀다.
+ */
 		delta -= delta_w;
 
 		/* Figure out how many additional periods this update spans */
 		periods = delta / 1024;
 		delta %= 1024;
 
+/* IAMROOT-12:
+ * -------------
+ * 기존 로드 값에 periods+1 기간만큼 decay 한다.
+ * (+1을 해야하는 이유: 잔량 처리한 것을 포함시키기 위해)
+ */
 		sa->runnable_avg_sum = decay_load(sa->runnable_avg_sum,
 						  periods + 1);
 		sa->runnable_avg_period = decay_load(sa->runnable_avg_period,
 						     periods + 1);
 
 		/* Efficiently calculate \sum (1..n_period) 1024*y^i */
+
+/* IAMROOT-12:
+ * -------------
+ * 기존 로드 값 + 주어진 기간 만큼 decay sum한 새 로드 값 추가
+ */
 		runnable_contrib = __compute_runnable_contrib(periods);
 		if (runnable)
 			sa->runnable_avg_sum += runnable_contrib;
@@ -2565,6 +2766,12 @@ static __always_inline int __update_entity_runnable_avg(u64 now,
 	}
 
 	/* Remainder of delta accrued against u_0` */
+
+/* IAMROOT-12:
+ * -------------
+ * 러너블 로드 평균합과 평균 기간에 잔량 delta를 합산한다. 
+ * (decay되고 남은 delta를 합산)
+ */
 	if (runnable)
 		sa->runnable_avg_sum += delta;
 	sa->runnable_avg_period += delta;
@@ -2595,6 +2802,13 @@ static inline void __update_cfs_rq_tg_load_contrib(struct cfs_rq *cfs_rq,
 	struct task_group *tg = cfs_rq->tg;
 	long tg_contrib;
 
+/* IAMROOT-12:
+ * -------------
+ * cfs_rq->tg_load_contrib = cfs런큐의 러너블 로드 평균 + 블럭드 로드 평균 
+ * (변동분이 기존 값의 1/8을 초과할때에 갱신한다) 
+ *
+ * tg->load_avg에도 변동분 추가
+ */
 	tg_contrib = cfs_rq->runnable_load_avg + cfs_rq->blocked_load_avg;
 	tg_contrib -= cfs_rq->tg_load_contrib;
 
@@ -2618,10 +2832,23 @@ static inline void __update_tg_runnable_avg(struct sched_avg *sa,
 	long contrib;
 
 	/* The fraction of a cpu used by this cfs_rq */
+
+/* IAMROOT-12:
+ * -------------
+ * contrib = 1024 * 러너블 비율(sum / period) - tg_runnable_contrib 
+ *    169  =                920               -     751 
+ *
+ * tg_runnable_contrib = 1024 * 러너블 비율(sum / period) 
+ * tg->runnable_avg = tg_runnable_avg(751) + 169 = 920
+ */
 	contrib = div_u64((u64)sa->runnable_avg_sum << NICE_0_SHIFT,
 			  sa->runnable_avg_period + 1);
 	contrib -= cfs_rq->tg_runnable_contrib;
 
+/* IAMROOT-12:
+ * -------------
+ * 변동분이 원래 있던 값의 1/64보다는 커야 반영을 한다.
+ */
 	if (abs(contrib) > cfs_rq->tg_runnable_contrib / 64) {
 		atomic_add(contrib, &tg->runnable_avg);
 		cfs_rq->tg_runnable_contrib += contrib;
@@ -2636,6 +2863,13 @@ static inline void __update_group_entity_contrib(struct sched_entity *se)
 
 	u64 contrib;
 
+/* IAMROOT-12:
+ * -------------
+ * 그룹에 설정된 shares 값에 비율(cfs_rq / tg)을 적용하여 엔티티에 대입한다.
+ *
+ * se->avg.load_avg_contrib = 
+ *	tg->shares * cfs_rq->tg_load_contrib / tg->load_avg
+ */
 	contrib = cfs_rq->tg_load_contrib * tg->shares;
 	se->avg.load_avg_contrib = div_u64(contrib,
 				     atomic_long_read(&tg->load_avg) + 1);
@@ -2663,6 +2897,12 @@ static inline void __update_group_entity_contrib(struct sched_entity *se)
 	 * of consequential size guaranteed to see n_i*w_i quickly converge to
 	 * our upper bound of 1-cpu.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * tg->runnable_avg가 1024보다 작은 경우에 한해 
+ *	se->avg.load_avg_contrib * 비율(tg->runnable_avg / 1024)
+ */
 	runnable_avg = atomic_read(&tg->runnable_avg);
 	if (runnable_avg < NICE_0_LOAD) {
 		se->avg.load_avg_contrib *= runnable_avg;
@@ -2689,6 +2929,11 @@ static inline void __update_task_entity_contrib(struct sched_entity *se)
 	u32 contrib;
 
 	/* avoid overflowing a 32-bit type w/ SCHED_LOAD_SCALE */
+
+/* IAMROOT-12:
+ * -------------
+ * avg.load_avg_contrib = se->load.weight * 러너블 비율(sum / period)
+ */
 	contrib = se->avg.runnable_avg_sum * scale_load_down(se->load.weight);
 	contrib /= (se->avg.runnable_avg_period + 1);
 	se->avg.load_avg_contrib = scale_load(contrib);
@@ -2700,12 +2945,34 @@ static long __update_entity_load_avg_contrib(struct sched_entity *se)
 	long old_contrib = se->avg.load_avg_contrib;
 
 	if (entity_is_task(se)) {
+
+/* IAMROOT-12:
+ * -------------
+ * se->avg.runnable_load_avg = 태스크의 weight * 러너블 비율
+ */
 		__update_task_entity_contrib(se);
 	} else {
+
+/* IAMROOT-12:
+ * -------------
+ * cfs_rq->tg_runnable_contrib = 1024 * 러너블 비율 
+ * tg->runnable_avg            =       (상동)
+ */
 		__update_tg_runnable_avg(&se->avg, group_cfs_rq(se));
+
+/* IAMROOT-12:
+ * -------------
+ * se->avg.load_avg_contrib = 
+ *	tg->shares * 비율1(cfs_rq->tg_load_contrib / tg->load_avg)
+ *	           * 비율2(tg->runnable_avg / 1024)
+ */
 		__update_group_entity_contrib(se);
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * se->avg.load_avg_contrib 변화분만을 반환한다.
+ */
 	return se->avg.load_avg_contrib - old_contrib;
 }
 
@@ -2737,14 +3004,29 @@ static inline void update_entity_load_avg(struct sched_entity *se,
 	else
 		now = cfs_rq_clock_task(group_cfs_rq(se));
 
+/* IAMROOT-12:
+ * -------------
+ * 1) 러너블 로드 평균 산출을 위한 기간과 러너블 로드 합계를 산출한다.
+ * se->avg.runnable_avg_period & se->avg.runnable_avg_sum
+ */
 	if (!__update_entity_runnable_avg(now, &se->avg, se->on_rq))
 		return;
 
+/* IAMROOT-12:
+ * -------------
+ * 2) se->avg.runnable_load_avg를 산출한다.
+ *    a) se->load.weight를 반영한 스케줄 엔티티의 러너블 로드 평균 산출
+ *    b) shares를 반영한 스케줄 엔티티의 러너블 로드 평균을 산출 
+ */
 	contrib_delta = __update_entity_load_avg_contrib(se);
 
 	if (!update_cfs_rq)
 		return;
 
+/* IAMROOT-12:
+ * -------------
+ * 3) se->avg.runnable_load_avg 변동분을 cfs 런큐에도 추가한다.
+ */
 	if (se->on_rq)
 		cfs_rq->runnable_load_avg += contrib_delta;
 	else
@@ -2757,19 +3039,37 @@ static inline void update_entity_load_avg(struct sched_entity *se,
  */
 static void update_cfs_rq_blocked_load(struct cfs_rq *cfs_rq, int force_update)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * ns -> ms 단위로 변환한다.
+ */
 	u64 now = cfs_rq_clock_task(cfs_rq) >> 20;
 	u64 decays;
 
+/* IAMROOT-12:
+ * -------------
+ * 마지막 decay 시각(ms)을 기록한 이후 소요된 기간(ms 단위)
+ */
 	decays = now - cfs_rq->last_decay;
 	if (!decays && !force_update)
 		return;
 
+/* IAMROOT-12:
+ * -------------
+ * cfs_rq->blocked_load_avg에서 removed_load 값만큼 감소시킨다.
+ */
 	if (atomic_long_read(&cfs_rq->removed_load)) {
 		unsigned long removed_load;
 		removed_load = atomic_long_xchg(&cfs_rq->removed_load, 0);
 		subtract_blocked_load_contrib(cfs_rq, removed_load);
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * cfs_rq->blocked_load_avg를 decay 시킨다.
+ * decay_counter에는 decay된 시간(ms)을 추가한다.
+ */
 	if (decays) {
 		cfs_rq->blocked_load_avg = decay_load(cfs_rq->blocked_load_avg,
 						      decays);
@@ -3288,11 +3588,31 @@ entity_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr, int queued)
 	/*
 	 * Update run-time statistics of the 'current'.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * cfs 런큐의 현재 스케줄 엔티티에 대해 다음 등을 처리한다.
+ *	- se->vruntime 갱신
+ *	- cfs_rq->min_vruntime 갱신 
+ *	- se->sum_exec_runtime 갱신 
+ *	- cfs_rq->exec_clock 갱신 
+ *	- cfs bandwidth 처리 
+ *	- se가 태스크인 경우 
+ *		- 태스크 그룹별 실행 누적 시간 갱신
+ *		- 태스크의 cputimer에 실행 누적 시간 갱신
+ */
 	update_curr(cfs_rq);
 
 	/*
 	 * Ensure that runnable average is periodically updated.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * 스케줄 엔티티의 러너블 로드 평균을 산출한다.
+ *	1) 태스크인 경우 weight를 반영 
+ *	2) 그룹인 경우 share를 반영
+ */
 	update_entity_load_avg(curr, 1);
 	update_cfs_rq_blocked_load(cfs_rq, 1);
 	update_cfs_shares(cfs_rq);
@@ -3396,6 +3716,10 @@ static inline u64 cfs_rq_clock_task(struct cfs_rq *cfs_rq)
 	if (unlikely(cfs_rq->throttle_count))
 		return cfs_rq->throttled_clock_task;
 
+/* IAMROOT-12:
+ * -------------
+ * 스로틀된 시간을 제외한 시각을 반환한다.
+ */
 	return rq_clock_task(rq_of(cfs_rq)) - cfs_rq->throttled_clock_task_time;
 }
 
@@ -7714,6 +8038,10 @@ static void task_tick_fair(struct rq *rq, struct task_struct *curr, int queued)
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &curr->se;
 
+/* IAMROOT-12:
+ * -------------
+ * 태스크에 대해 최상위 스케줄 엔티티까지 entity_tick() 함수를 호출한다.
+ */
 	for_each_sched_entity(se) {
 		cfs_rq = cfs_rq_of(se);
 		entity_tick(cfs_rq, se, queued);

@@ -151,11 +151,19 @@ static void hrtimer_get_softirq_time(struct hrtimer_cpu_base *base)
 	ktime_t xtim, mono, boot, tai;
 	ktime_t off_real, off_boot, off_tai;
 
+/* IAMROOT-12:
+ * -------------
+ * tk에서 mono 타임을 얻어오고 나머지 3개 클럭의 offset 값도 가져온다.
+ */
 	mono = ktime_get_update_offsets_tick(&off_real, &off_boot, &off_tai);
 	boot = ktime_add(mono, off_boot);
 	xtim = ktime_add(mono, off_real);
 	tai = ktime_add(mono, off_tai);
 
+/* IAMROOT-12:
+ * -------------
+ * 가져온 기준 시각들을 각 clock base의 softirq_time에 대입한다.
+ */
 	base->clock_base[HRTIMER_BASE_REALTIME].softirq_time = xtim;
 	base->clock_base[HRTIMER_BASE_MONOTONIC].softirq_time = mono;
 	base->clock_base[HRTIMER_BASE_BOOTTIME].softirq_time = boot;
@@ -817,6 +825,10 @@ static void retrigger_next_event(void *arg)
 	if (!hrtimer_hres_active())
 		return;
 
+/* IAMROOT-12:
+ * -------------
+ * timekeeping의 realtime이 변경된 경우 hrtimer의 리트리거 작업을 해야 한다.
+ */
 	raw_spin_lock(&base->lock);
 	hrtimer_update_base(base);
 	hrtimer_force_reprogram(base, 0);
@@ -900,6 +912,12 @@ static inline void retrigger_next_event(void *arg) { }
  */
 void clock_was_set(void)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * timekeeping의 realtime이 바뀌었으므로 cpu마다 동작하는 hrtimer들도
+ * 거기에 따른 리트리거 작업을 한다.
+ */
 #ifdef CONFIG_HIGH_RES_TIMERS
 	/* Retrigger the CPU local events everywhere */
 	on_each_cpu(retrigger_next_event, NULL, 1);
@@ -1862,14 +1880,27 @@ void hrtimer_run_queues(void)
 	struct hrtimer_clock_base *base;
 	int index, gettime = 1;
 
+/* IAMROOT-12:
+ * -------------
+ * hrtimer가 동작하는 중이면 함수를 빠져나간다.
+ */
 	if (hrtimer_hres_active())
 		return;
 
+/* IAMROOT-12:
+ * -------------
+ * hrtimer가 아직 준비되지 않은 경우는 이 루틴에서 관리한다.
+ */
 	for (index = 0; index < HRTIMER_MAX_CLOCK_BASES; index++) {
 		base = &cpu_base->clock_base[index];
 		if (!timerqueue_getnext(&base->active))
 			continue;
 
+/* IAMROOT-12:
+ * -------------
+ * 처음 타이머에 대해서 처리하기 전에 먼저 기준 시각을 얻어와서 각 clock base의
+ * softirq_time에 대입한다.
+ */
 		if (gettime) {
 			hrtimer_get_softirq_time(cpu_base);
 			gettime = 0;
@@ -1877,10 +1908,19 @@ void hrtimer_run_queues(void)
 
 		raw_spin_lock(&cpu_base->lock);
 
+/* IAMROOT-12:
+ * -------------
+ * RB 트리에서 대기중인 hrtimer를 하나가져와서 만료되었으면 처리한다.
+ */
 		while ((node = timerqueue_getnext(&base->active))) {
 			struct hrtimer *timer;
 
 			timer = container_of(node, struct hrtimer, node);
+
+/* IAMROOT-12:
+ * -------------
+ * 만료시각이 되지 않은 경우 루프를 벗어난다.
+ */
 			if (base->softirq_time.tv64 <=
 					hrtimer_get_expires_tv64(timer))
 				break;

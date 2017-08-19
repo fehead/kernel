@@ -505,3 +505,40 @@ of_irq_init
 ```
 	cascade
 ```
+
+### 2017.08.05
+#### 참고
+
+#### 진도
+- update_cfs_shares
+```
+	calc_cfs_shares
+		reweight_entity
+			account_entity_dequeue
+			account_entity_enqueue
+```
+
+- entity_tick
+```
+	update_entity_load_avg
+	update_cfs_shares
+```
+
+- update_cfs_rq_blocked_load
+
+### 2017.08.19
+#### 참고
+ - http://jake.dothome.co.kr/bandwidth
+
+#### 진도
+- resched_curr
+
+- scheduler_ipi
+
+- scheduler_tick
+```
+	update_cpu_load_active
+```
+
+- init_cfs_bandwidth
+- tg_set_cfs_quota

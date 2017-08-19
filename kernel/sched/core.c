@@ -803,6 +803,10 @@ void sched_avg_update(struct rq *rq)
  *
  * Caller must hold rcu_lock or sufficient equivalent.
  */
+/* IAMROOT-12 fehead (2017-08-19):
+ * --------------------------
+ * walk_tg_tree_from(&root_task_group, tg_cfs_schedulable_down, tg_nop, &data);
+ */
 int walk_tg_tree_from(struct task_group *from,
 			     tg_visitor down, tg_visitor up, void *data)
 {
@@ -812,6 +816,10 @@ int walk_tg_tree_from(struct task_group *from,
 	parent = from;
 
 down:
+	/* IAMROOT-12 fehead (2017-08-19):
+	 * --------------------------
+	 * down = tg_cfs_schedulable_down
+	 */
 	ret = (*down)(parent, data);
 	if (ret)
 		goto out;
@@ -822,6 +830,10 @@ down:
 up:
 		continue;
 	}
+/* IAMROOT-12 fehead (2017-08-19):
+ * --------------------------
+ * up = tg_nop
+ */
 	ret = (*up)(parent, data);
 	if (ret || parent == from)
 		goto out;

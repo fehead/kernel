@@ -462,6 +462,11 @@ void calc_global_load(unsigned long ticks)
  * Called from update_cpu_load() to periodically update this CPU's
  * active count.
  */
+/* IAMROOT-12 fehead (2017-08-19):
+ * --------------------------
+ * 약 5초(LOAD_FREQ) 마다 한번씩 active된 task개수를 산출한다.
+ * global load 관련(calc_load_tasks) 개수를 산출한다.
+ */
 static void calc_load_account_active(struct rq *this_rq)
 {
 	long delta;

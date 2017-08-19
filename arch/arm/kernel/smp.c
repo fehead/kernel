@@ -456,6 +456,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 /* IAMROOT-12 fehead (2016-11-24):
  * --------------------------
  * smp_cross_call = bcm2835_send_doorbell;
+ *	gic : gic_raise_softirq
  */
 static void (*__smp_cross_call)(const struct cpumask *, unsigned int);
 

@@ -221,7 +221,7 @@ static void __update_inv_weight(struct load_weight *lw)
 
 /* IAMROOT-12:
  * -------------
- * delta_exec(time_slice) * 1024 / lw.weight 
+ * delta_exec(time_slice) * weight / lw.weight 
  *
  * 예) delta_exec=3000000(ns),  nice=-1인 경우 반환되는 vruntime은?
  *	nice=-1인 경우 lw.weight=1277
@@ -607,8 +607,16 @@ static void __dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se)
 
 struct sched_entity *__pick_first_entity(struct cfs_rq *cfs_rq)
 {
+/* IAMROOT-12:
+ * -------------
+ * leftmost에 연결된 스케줄 엔티티를 반환한다. (첫 엔티티)
+ */
 	struct rb_node *left = cfs_rq->rb_leftmost;
 
+/* IAMROOT-12:
+ * -------------
+ * 대기하는 엔티티가 없는 경우 null (curr만 1개 있는 경우는 대기가 없음)
+ */
 	if (!left)
 		return NULL;
 
@@ -697,6 +705,32 @@ static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se)
  */
 static u64 __sched_period(unsigned long nr_running)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * 스케줄 레이튼시를 산출한다.
+ *	1) 시간 분할을 할 엔티티 수가 8개 이하인 경우 정해진 
+ *	   스케줄 레이튼시(6ms * cpu factor)를 사용한다.
+ *	2) 8개를 초과하는 경우 정해진 최소값(0.75ms x cpu factor) * 엔티티 수로 
+ *	   사용한다.
+ *
+ * cpu factor: ilog2(cpu 수) + 1
+ *	- rpi2: 3
+ *
+ * sysctl_sched_latency(6ms * cpu factor)
+ *	- "/proc/sys/kernel/sched_latency_ns"
+ *		- rpi2: 18000000 (18ms)
+ *
+ * sched_nr_latency(8개)
+ *	- 위의 sysctl_sched_latency 값을 사용하기 위한 조건으로 이 값(8개)
+ *	  이하일 때 이용한다.
+ *	- "/proc/sys/kernel/sched_nr_latency"
+ *		- rpi2: 8
+ *
+ * sched_min_granularity(0.75ms * cpu factor)
+ *	- "/proc/sys/kernel/sched_min_granularity_ns"
+ *		- rpi2: 2250000 (0.75ms x 3 = 2.25ms) 
+ */
 	u64 period = sysctl_sched_latency;
 	unsigned long nr_latency = sched_nr_latency;
 
@@ -716,8 +750,21 @@ static u64 __sched_period(unsigned long nr_running)
  */
 static u64 sched_slice(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * 스케줄 엔티티 수와 추가할 엔티티 1개를 더한 수로 전체 스케줄 레이튼시를 
+ * 산출한다.
+ *	- rpi2: 8개 이하에서 18ms이고, 그 외의 경우 2.25ms x 엔티티 수
+ */
 	u64 slice = __sched_period(cfs_rq->nr_running + !se->on_rq);
 
+/* IAMROOT-12:
+ * -------------
+ * 각 엔티티의 로드 weight 값들이 이미 cfs 런큐에 합산되어 있는데
+ * 요청한 se가 아직 런큐에 없는 경우 곧 런큐에 들어갈 예정이므로 
+ * 로드 weight을 추가 합산한다.
+ */
 	for_each_sched_entity(se) {
 		struct load_weight *load;
 		struct load_weight lw;
@@ -731,6 +778,11 @@ static u64 sched_slice(struct cfs_rq *cfs_rq, struct sched_entity *se)
 			update_load_add(&lw, se->load.weight);
 			load = &lw;
 		}
+
+/* IAMROOT-12:
+ * -------------
+ * 해당 엔티티의 time slice를 산출한다.
+ */
 		slice = __calc_delta(slice, se->load.weight, load);
 	}
 	return slice;
@@ -2394,7 +2446,17 @@ static inline void account_numa_dequeue(struct rq *rq, struct task_struct *p)
 static void
 account_entity_enqueue(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
+/* IAMROOT-12:
+ * -------------
+ * cfs 런큐에 스케줄 엔티티의 로드 값을 추가하여 반영한다 
+ */
 	update_load_add(&cfs_rq->load, se->load.weight);
+
+/* IAMROOT-12:
+ * -------------
+ * 최상위 스케줄 엔티티인 경우(root 그룹의 cfs 런큐에 소속되어 있는 se)
+ * 런큐의 load 값에도 추가한다. (런큐(cpu)에 있는 total load 값)
+ */
 	if (!parent_entity(se))
 		update_load_add(&rq_of(cfs_rq)->load, se->load.weight);
 #ifdef CONFIG_SMP
@@ -2411,7 +2473,18 @@ account_entity_enqueue(struct cfs_rq *cfs_rq, struct sched_entity *se)
 static void
 account_entity_dequeue(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * cfs 런큐에 반영되어 있던 스케줄 엔티티의 로드 값을 감소시킨다.
+ */
 	update_load_sub(&cfs_rq->load, se->load.weight);
+
+/* IAMROOT-12:
+ * -------------
+ * 최상위 스케줄 엔티티인 경우(root 그룹의 cfs 런큐에 소속되어 있는 se)
+ * 런큐의 load 값에서도 감소시킨다. (런큐(cpu)에 있는 total load 값)
+ */
 	if (!parent_entity(se))
 		update_load_sub(&rq_of(cfs_rq)->load, se->load.weight);
 	if (entity_is_task(se)) {
@@ -2432,6 +2505,11 @@ static inline long calc_tg_weight(struct task_group *tg, struct cfs_rq *cfs_rq)
 	 * to gain a more accurate current total weight. See
 	 * update_cfs_rq_load_contribution().
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * tg_weight = tg->load_avg - cfs_rq->tg_load_contrib + cfs_rq->load.weight
+ */
 	tg_weight = atomic_long_read(&tg->load_avg);
 	tg_weight -= cfs_rq->tg_load_contrib;
 	tg_weight += cfs_rq->load.weight;
@@ -2443,6 +2521,19 @@ static long calc_cfs_shares(struct cfs_rq *cfs_rq, struct task_group *tg)
 {
 	long tg_weight, load, shares;
 
+/* IAMROOT-12:
+ * -------------
+ * shares = tg->shares * cfs_rq->load.weight / tg_weight
+ * (tg_weight = tg->load_avg - cfs_rq->tg_load_contrib + cfs_rq->load.weight)
+ *
+ * shares = shares * weight / (tg->load_avg - cfs_rq->tg_load_contrib + weight)
+ *                            ^                ^
+ *                            |                +--- 이 값이 항상 작거나 같다.
+ *                            |
+ *                      이 값이 항상 크거나 같다.
+ *
+ *          결국은 이 함수를 통해 shares 값이 같거나 작아진다. 
+ */
 	tg_weight = calc_tg_weight(tg, cfs_rq);
 	load = cfs_rq->load.weight;
 
@@ -2450,6 +2541,11 @@ static long calc_cfs_shares(struct cfs_rq *cfs_rq, struct task_group *tg)
 	if (tg_weight)
 		shares /= tg_weight;
 
+/* IAMROOT-12:
+ * -------------
+ * 산출된 shares 결과가 2보다 작아지지 않도록 제한한다.
+ * 산출된 shares 결과가 원래 값보다 커지지 않도록 제한한다.
+ */
 	if (shares < MIN_SHARES)
 		shares = MIN_SHARES;
 	if (shares > tg->shares)
@@ -2466,6 +2562,12 @@ static inline long calc_cfs_shares(struct cfs_rq *cfs_rq, struct task_group *tg)
 static void reweight_entity(struct cfs_rq *cfs_rq, struct sched_entity *se,
 			    unsigned long weight)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * cfs 런큐의 로드 weight - se의 기존 weight + se의 새 weight 
+ * (최상위 se인 경우 런큐의 로드 weight - se의 기존 weight + se의 새 weight)
+ */
 	if (se->on_rq) {
 		/* commit outstanding execution time */
 		if (cfs_rq->curr == se)
@@ -2473,6 +2575,10 @@ static void reweight_entity(struct cfs_rq *cfs_rq, struct sched_entity *se,
 		account_entity_dequeue(cfs_rq, se);
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * 스케줄 엔티티의 로드 값을 weight(비율 반영된 shares) 값으로 설정한다.
+ */
 	update_load_set(&se->load, weight);
 
 	if (se->on_rq)
@@ -2487,6 +2593,10 @@ static void update_cfs_shares(struct cfs_rq *cfs_rq)
 	struct sched_entity *se;
 	long shares;
 
+/* IAMROOT-12:
+ * -------------
+ * tg->shares * 비율 -> se부터 cfs_rq 및 rq 까지 weight를 재산출한다.
+ */
 	tg = cfs_rq->tg;
 	se = tg->se[cpu_of(rq_of(cfs_rq))];
 	if (!se || throttled_hierarchy(cfs_rq))
@@ -2495,6 +2605,11 @@ static void update_cfs_shares(struct cfs_rq *cfs_rq)
 	if (likely(se->load.weight == tg->shares))
 		return;
 #endif
+
+/* IAMROOT-12:
+ * -------------
+ * shares = shares * cfs->load_weight / ((tg - cfs) + cfs->load.weight)
+ */
 	shares = calc_cfs_shares(cfs_rq, tg);
 
 	reweight_entity(cfs_rq_of(se), se, shares);
@@ -2834,7 +2949,9 @@ static inline void __update_tg_runnable_avg(struct sched_avg *sa,
 	/* The fraction of a cpu used by this cfs_rq */
 
 /* IAMROOT-12:
- * -------------
+ * ------------- 
+ * 1024 weight 기준으로 se에 산출된 러너블 비율을 cfs_rq 및 tg에 적용한다.
+ *
  * contrib = 1024 * 러너블 비율(sum / period) - tg_runnable_contrib 
  *    169  =                920               -     751 
  *
@@ -2948,14 +3065,14 @@ static long __update_entity_load_avg_contrib(struct sched_entity *se)
 
 /* IAMROOT-12:
  * -------------
- * se->avg.runnable_load_avg = 태스크의 weight * 러너블 비율
+ * se->avg.load_avg_contrib = se->load.weight * 러너블 비율(sum / period)
  */
 		__update_task_entity_contrib(se);
 	} else {
 
 /* IAMROOT-12:
  * -------------
- * cfs_rq->tg_runnable_contrib = 1024 * 러너블 비율 
+ * cfs_rq->tg_runnable_contrib = (1024 * 러너블 비율) 변동분
  * tg->runnable_avg            =       (상동)
  */
 		__update_tg_runnable_avg(&se->avg, group_cfs_rq(se));
@@ -2994,6 +3111,15 @@ static inline void update_entity_load_avg(struct sched_entity *se,
 	struct cfs_rq *cfs_rq = cfs_rq_of(se);
 	long contrib_delta;
 	u64 now;
+
+/* IAMROOT-12:
+ * -------------
+ * 이 함수를 호출하는 함수들
+ *	1) entity_tick()
+ *	2) enqueue_entity_load_avg()
+ *	3) dequeue_entity_load_avg()
+ *	4) put_prev_entity()
+ */
 
 	/*
 	 * For a group entity we need to use their owned cfs_rq_clock_task() in
@@ -3077,6 +3203,13 @@ static void update_cfs_rq_blocked_load(struct cfs_rq *cfs_rq, int force_update)
 		cfs_rq->last_decay = now;
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * cfs_rq->tg_load_contrib = cfs런큐의 러너블 로드 평균 + 블럭드 로드 평균 
+ * (변동분이 기존 값의 1/8을 초과할때에 갱신한다) 
+ *
+ * tg->load_avg에도 변동분 추가
+ */
 	__update_cfs_rq_tg_load_contrib(cfs_rq, force_update);
 }
 
@@ -3140,7 +3273,16 @@ static inline void dequeue_entity_load_avg(struct cfs_rq *cfs_rq,
 	/* we force update consideration on load-balancer moves */
 	update_cfs_rq_blocked_load(cfs_rq, !sleep);
 
+/* IAMROOT-12:
+ * -------------
+ * cfs 런큐의 러너블 로드에서 se 로드 평균 기여를 감소시킨다.
+ */
 	cfs_rq->runnable_load_avg -= se->avg.load_avg_contrib;
+
+/* IAMROOT-12:
+ * -------------
+ * 슬립 목적으로 진입한 경우 blocked_load_avg에 그 감소 값을 추가한다.
+ */
 	if (sleep) {
 		cfs_rq->blocked_load_avg += se->avg.load_avg_contrib;
 		se->avg.decay_count = atomic64_read(&cfs_rq->decay_counter);
@@ -3369,6 +3511,11 @@ static void __clear_buddies_skip(struct sched_entity *se)
 
 static void clear_buddies(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * last, next, skip 버디 엔티티들 지정을 모두 클리어한다.
+ */
 	if (cfs_rq->last == se)
 		__clear_buddies_last(se);
 
@@ -3436,14 +3583,34 @@ check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 	struct sched_entity *se;
 	s64 delta;
 
+/* IAMROOT-12:
+ * -------------
+ * 현재 엔티티에 대해 배정된 time slice 시간을 산출한다.
+ */
 	ideal_runtime = sched_slice(cfs_rq, curr);
+
+/* IAMROOT-12:
+ * -------------
+ * 스케줄되어 실행된 시간을 산출한다.
+ */
 	delta_exec = curr->sum_exec_runtime - curr->prev_sum_exec_runtime;
+
+/* IAMROOT-12:
+ * -------------
+ * 엔티티에 대해 할당된 시간을 초과 실행하였으므로 리스케줄링 요청을 한다.
+ * hrtick으로 진입한 경우는 항상 이 조건을 만족하지만 스케줄 틱으로 
+ * 진입한 경우 이 조건을 만족하는지 여부를 항상 체크해야 한다.
+ */
 	if (delta_exec > ideal_runtime) {
 		resched_curr(rq_of(cfs_rq));
 		/*
 		 * The current task ran long enough, ensure it doesn't get
 		 * re-elected due to buddy favours.
 		 */
+/* IAMROOT-12:
+ * -------------
+ * 현재 스케줄엔티티가 last, next, skip 버디 엔티티로 지정된 경우 클리어한다.
+ */
 		clear_buddies(cfs_rq, curr);
 		return;
 	}
@@ -3453,15 +3620,34 @@ check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 	 * narrow margin doesn't have to wait for a full slice.
 	 * This also mitigates buddy induced latencies under load.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * 최소 preemption 단위의 시간 이내에는 preemption을 하지 못하게 한다.
+ *	- rpi2: 2.25ms
+ */
 	if (delta_exec < sysctl_sched_min_granularity)
 		return;
 
+/* IAMROOT-12:
+ * -------------
+ * curr 엔티티와 rb 트리에서 대기중인 첫 엔티티와 vruntime을 비교하여 
+ * preemption 여부를 결정한다. 우선 순위가 바뀌지 않은 경우 그냥 함수를 
+ * 빠져나간다.
+ */
 	se = __pick_first_entity(cfs_rq);
 	delta = curr->vruntime - se->vruntime;
 
 	if (delta < 0)
 		return;
 
+/* IAMROOT-12:
+ * -------------
+ * 대기 중인 엔티티가 curr 엔티티보다 vurntime이 많이 역전된 경우에만 리스케줄 
+ * 요청을한다.
+ *
+ * 대기 중인 엔티티의 우선 순위가 높은 경우 preemption 기회를 더 준다.
+ */
 	if (delta > ideal_runtime)
 		resched_curr(rq_of(cfs_rq));
 }
@@ -3509,6 +3695,11 @@ wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se);
 static struct sched_entity *
 pick_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 {
+
+/* IAMROOT-12:
+ * -------------
+ * RB 트리에서 대기하는 첫 엔티티
+ */
 	struct sched_entity *left = __pick_first_entity(cfs_rq);
 	struct sched_entity *se;
 
@@ -3519,6 +3710,10 @@ pick_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 	if (!left || (curr && entity_before(curr, left)))
 		left = curr;
 
+/* IAMROOT-12:
+ * -------------
+ * curr 또는 leftmost가 대입된다.
+ */
 	se = left; /* ideally we run the leftmost entity */
 
 	/*
@@ -3622,6 +3817,12 @@ entity_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr, int queued)
 	 * queued ticks are scheduled to match the slice, so don't bother
 	 * validating it and just reschedule.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * hrtick에 의해 이 함수가 호출되면 queue=1이 되어 무조건 리스케줄 요청한다.
+ * 정규 스케줄 틱에 의해 이 함수가 호출되면 queue=0이 되어 다음으로 넘어간다.
+ */
 	if (queued) {
 		resched_curr(rq_of(cfs_rq));
 		return;
@@ -3634,6 +3835,11 @@ entity_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr, int queued)
 		return;
 #endif
 
+/* IAMROOT-12:
+ * -------------
+ * 스케줄 엔티티가 2개 이상 동작하는 경우 preemption 할지 여부를 체크하고
+ * 필요 시 리스케줄 요청한다.
+ */
 	if (cfs_rq->nr_running > 1)
 		check_preempt_tick(cfs_rq, curr);
 }
@@ -4435,15 +4641,30 @@ static void hrtick_start_fair(struct rq *rq, struct task_struct *p)
 	WARN_ON(task_rq(p) != rq);
 
 	if (cfs_rq->nr_running > 1) {
+
+/* IAMROOT-12:
+ * -------------
+ * slice: 엔티티에 계획된 time slice 
+ * ran:	  이미 수행한 시간
+ */
 		u64 slice = sched_slice(cfs_rq, se);
 		u64 ran = se->sum_exec_runtime - se->prev_sum_exec_runtime;
 		s64 delta = slice - ran;
 
+/* IAMROOT-12:
+ * -------------
+ * 계획된 시간을 더 초과하여 소모한 경우 리스케줄 요청을 한다.
+ */
 		if (delta < 0) {
 			if (rq->curr == p)
 				resched_curr(rq);
 			return;
 		}
+
+/* IAMROOT-12:
+ * -------------
+ * 남은 시간을 hrtick 프로그래밍한다.
+ */
 		hrtick_start(rq, delta);
 	}
 }
@@ -4460,6 +4681,12 @@ static void hrtick_update(struct rq *rq)
 	if (!hrtick_enabled(rq) || curr->sched_class != &fair_sched_class)
 		return;
 
+/* IAMROOT-12:
+ * -------------
+ * cfs 런큐에서 8개 미만의 엔티티가 러너블한 경우 hrtick을 프로그래밍한다.
+ * (아마 작은 기간에 대해 많은 hrtick이 발생하여 스케줄되는 것이 
+ * 큰 부담으로 느끼는듯..)
+ */
 	if (cfs_rq_of(&curr->se)->nr_running < sched_nr_latency)
 		hrtick_start_fair(rq, curr);
 }
@@ -4486,9 +4713,20 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	struct sched_entity *se = &p->se;
 
 	for_each_sched_entity(se) {
+
+/* IAMROOT-12:
+ * -------------
+ * 엔티티가 이미 cfs 런큐에 있는 경우 break
+ */
 		if (se->on_rq)
 			break;
 		cfs_rq = cfs_rq_of(se);
+
+/* IAMROOT-12:
+ * -------------
+ * 최상위 엔티티까지 등록되지 않은 엔티티들을 엔큐한다.
+ * (내부에서 nr_running이 증가한다)
+ */
 		enqueue_entity(cfs_rq, se, flags);
 
 		/*
@@ -4497,13 +4735,30 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 		 * note: in the case of encountering a throttled cfs_rq we will
 		 * post the final h_nr_running increment below.
 		*/
+
+/* IAMROOT-12:
+ * -------------
+ * cfs bandwidth로 인해 해당 cfs 런큐가 스로틀링하는 경우 break
+ */
 		if (cfs_rq_throttled(cfs_rq))
 			break;
+
+/* IAMROOT-12:
+ * -------------
+ * 스로틀링 하지 않는 cfs 런큐에 모두 태스크 수를 1개씩 추가한다.
+ */
 		cfs_rq->h_nr_running++;
 
 		flags = ENQUEUE_WAKEUP;
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * 하이라키로 설정된 엔티티들을 최상위 엔티티까지 위에서 돌다가 엔티티가 이미 
+ * 런큐에 등록되어 있는 경우 이 엔티티부터 다시 최상위까지 순회한다.
+ *
+ * 이 루틴에서는 엔티티를 추가하지 않고 그냥 h_nr_running만 증가시킨다.
+ */
 	for_each_sched_entity(se) {
 		cfs_rq = cfs_rq_of(se);
 		cfs_rq->h_nr_running++;
@@ -4515,6 +4770,14 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 		update_entity_load_avg(se, 1);
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * 위 루프에서 정상적으로 최상위 엔티티까지 순회한 경우 런큐에도 nr_running을 
+ * 증가시킨다.
+ *
+ * cfs 런큐가 스로틀되어 동작하지 않을 때에는 런큐의 nr_running에 태스크 수가 
+ * 반영되지 않는다. 그러나 나중에 언스로틀할 때 반영한다.
+ */
 	if (!se) {
 		update_rq_runnable_avg(rq, rq->nr_running);
 		add_nr_running(rq, 1);
@@ -4533,6 +4796,11 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &p->se;
+
+/* IAMROOT-12:
+ * -------------
+ * sleep 목적으로 진입한 dequeue_task()
+ */
 	int task_sleep = flags & DEQUEUE_SLEEP;
 
 	for_each_sched_entity(se) {

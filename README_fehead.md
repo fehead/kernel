@@ -542,3 +542,18 @@ of_irq_init
 
 - init_cfs_bandwidth
 - tg_set_cfs_quota
+
+
+### 2017.08.26
+#### 참고
+ - http://jake.dothome.co.kr/bandwidth
+
+#### 진도
+- entity_tick -> update_curr
+```
+	account_cfs_rq_runtime
+		__account_cfs_rq_runtime
+			assign_cfs_rq_runtime
+```
+- check_cfs_rq_runtime
+- sched_cfs_period_timer

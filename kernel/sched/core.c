@@ -835,6 +835,14 @@ void sched_avg_update(struct rq *rq)
  * --------------------------
  * walk_tg_tree_from(&root_task_group, tg_cfs_schedulable_down, tg_nop, &data);
  */
+/* IAMROOT-12 fehead (2017-08-26):
+ * --------------------------
+ * walk_tg_tree_from(cfs_rq->tg, tg_throttle_down, tg_nop, (void *)rq);
+ */
+/* IAMROOT-12 fehead (2017-08-26):
+ * --------------------------
+ * walk_tg_tree_from(cfs_rq->tg, tg_nop, tg_unthrottle_up, (void *)rq);
+ */
 int walk_tg_tree_from(struct task_group *from,
 			     tg_visitor down, tg_visitor up, void *data)
 {

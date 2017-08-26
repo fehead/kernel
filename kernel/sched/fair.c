@@ -111,6 +111,16 @@ unsigned int __read_mostly sysctl_sched_shares_window = 10000000UL;
  *
  * default: 5 msec, units: microseconds
   */
+/* IAMROOT-12 fehead (2017-08-26):
+ * --------------------------
+ * cfs_rq가 할당량을 요청할 때마다 글로벌 (tg)에서 로컬 (cfs_rq) 풀로 할당 할 런
+ * 타임의 양.
+ *
+ * 참고 : 슬라이스가 남은 런타임 (소비 또는 할당량이 슬라이스보다 작게 지정 되었
+ *	기 때문에)을 초과하는 경우 항상 남은 사용 가능 시간 만 발급합니다.
+ *
+ * 기본값 : 5 밀리 초, 단위 : 마이크로 초
+ */
 unsigned int sysctl_sched_cfs_bandwidth_slice = 5000UL;
 #endif
 
@@ -893,6 +903,10 @@ static void update_curr(struct cfs_rq *cfs_rq)
 /* IAMROOT-12:
  * -------------
  * cfs bandwidth 처리를 수행한다.
+ */
+/* IAMROOT-12 fehead (2017-08-26):
+ * --------------------------
+ * account 는 계산후 처리 작업까지 포함하는 함수에서 자주쓴다.
  */
 	account_cfs_rq_runtime(cfs_rq, delta_exec);
 }
@@ -3528,6 +3542,10 @@ static void clear_buddies(struct cfs_rq *cfs_rq, struct sched_entity *se)
 
 static __always_inline void return_cfs_rq_runtime(struct cfs_rq *cfs_rq);
 
+/* IAMROOT-12 fehead (2017-08-26):
+ * --------------------------
+ * dequeue_entity(qcfs_rq, se, DEQUEUE_SLEEP);
+ */
 static void
 dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 {
@@ -3964,6 +3982,12 @@ static int assign_cfs_rq_runtime(struct cfs_rq *cfs_rq)
 		 * Refresh the global state and ensure bandwidth timer becomes
 		 * active.
 		 */
+		/* IAMROOT-12 fehead (2017-08-26):
+		 * --------------------------
+		 * 대역폭 풀이 비활성 상태가되면 마지막 소비 이후 적어도 하나의
+		 * 기간이 경과해야합니다. 전역 상태를 새로 고치고 대역폭 타이머
+		 * 가 활성화되는지 확인하십시오.
+		 */
 		if (!cfs_b->timer_active) {
 			__refill_cfs_bandwidth_runtime(cfs_b);
 			__start_cfs_bandwidth(cfs_b, false);
@@ -3983,6 +4007,11 @@ static int assign_cfs_rq_runtime(struct cfs_rq *cfs_rq)
 	 * we may have advanced our local expiration to account for allowed
 	 * spread between our sched_clock and the one on which runtime was
 	 * issued.
+	 */
+	/* IAMROOT-12 fehead (2017-08-26):
+	 * --------------------------
+	 * 우리는 우리의 sched_clock과 런타임이 발행 된 곳 사이에 허용 된 스프레
+	 * 드를 설명하기 위해 로컬 만료일을 향상시킬 수 있습니다.
 	 */
 	if ((s64)(expires - cfs_rq->runtime_expires) > 0)
 		cfs_rq->runtime_expires = expires;
@@ -4295,6 +4324,13 @@ next:
  * period the timer is deactivated until scheduling resumes; cfs_b->idle is
  * used to track this state.
  */
+/* IAMROOT-12 fehead (2017-08-26):
+ * --------------------------
+ * task_group의 대역폭을 다시 채우고 적절한 경우 cfs_rqs를 조절합니다. 마지막 기
+ * 간 내에 활동이 없으면 스케줄링이 재개 될 때까지 타이머가 비활성화됩니다.
+ * cfs_b->idle은이 상태를 추적하는 데 사용됩니다.
+ * 반환값은 idle여부(1:true, 0:false)를 반환합니다.
+ */
 static int do_sched_cfs_period_timer(struct cfs_bandwidth *cfs_b, int overrun)
 {
 	u64 runtime, runtime_expires;
@@ -4311,6 +4347,10 @@ static int do_sched_cfs_period_timer(struct cfs_bandwidth *cfs_b, int overrun)
 	 * idle depends on !throttled (for the case of a large deficit), and if
 	 * we're going inactive then everything else can be deferred
 	 */
+	/* IAMROOT-12 fehead (2017-08-26):
+	 * --------------------------
+	 * 비활성 상태가되면 다른 모든 것들은 연기 될 수 있습니다
+	 */
 	if (cfs_b->idle && !throttled)
 		goto out_deactivate;
 
@@ -4318,6 +4358,12 @@ static int do_sched_cfs_period_timer(struct cfs_bandwidth *cfs_b, int overrun)
 	 * if we have relooped after returning idle once, we need to update our
 	 * status as actually running, so that other cpus doing
 	 * __start_cfs_bandwidth will stop trying to cancel us.
+	 */
+	/* IAMROOT-12 fehead (2017-08-26):
+	 * --------------------------
+	 * 일단 유휴 상태로 돌아온 후에 다시 작업을했다면 실제로 실행중인 것으로
+	 * 상태를 업데이트해야합니다. 그러면 __start_cfs_bandwidth를하는 다른
+	 * CPU가 우리를 취소하려고 시도하지 않게됩니다.
 	 */
 	cfs_b->timer_active = 1;
 
@@ -4341,6 +4387,14 @@ static int do_sched_cfs_period_timer(struct cfs_bandwidth *cfs_b, int overrun)
 	 * in us over-using our runtime if it is all used during this loop, but
 	 * only by limited amounts in that extreme case.
 	 */
+	/* IAMROOT-12 fehead (2017-08-26):
+	 * --------------------------
+	 * 이 검사는 우리가 스로틀링을 해제하는 동안 새로운 대역폭을 유지하면서
+	 * 반복됩니다. 이것은 잠재적으로 글로벌 풀에서 새로운 대역폭을 확보하려
+	 * 고하는 조정되지 않은 그룹과 경쟁 할 수 있습니다. 이것은 우리가 이루프
+	 * 동안 모두 사용된다면 런타임을 과도하게 사용할 수 있지만 극단적인 경우
+	 * 에는 제한된 양만 사용하게됩니다.
+	 */
 	while (throttled && cfs_b->runtime > 0) {
 		runtime = cfs_b->runtime;
 		raw_spin_unlock(&cfs_b->lock);
@@ -4359,6 +4413,12 @@ static int do_sched_cfs_period_timer(struct cfs_bandwidth *cfs_b, int overrun)
 	 * unthrottle, this also covers the case in which the new bandwidth is
 	 * insufficient to cover the existing bandwidth deficit.  (Forcing the
 	 * timer to remain active while there are any throttled entities.)
+	 */
+	/* IAMROOT-12 fehead (2017-08-26):
+	 * --------------------------
+	 * 우리는 스로틀(unthrottle) 이후의 기간 동안 활동을 보장하지만, 새로운
+	 * 대역폭이 기존 대역폭 적자를 충당하기에는 불충분 한 경우도 포함합니다.
+	 * (스로틀 된 엔터티가있는 동안 타이머가 활성 상태를 유지하도록합니다.)
 	 */
 	cfs_b->idle = 0;
 
@@ -4485,6 +4545,12 @@ static void do_sched_cfs_slack_timer(struct cfs_bandwidth *cfs_b)
  * When a group wakes up we want to make sure that its quota is not already
  * expired/exceeded, otherwise it may be allowed to steal additional ticks of
  * runtime as update_curr() throttling can not not trigger until it's on-rq.
+ */
+/* IAMROOT-12 fehead (2017-08-26):
+ * --------------------------
+ * 그룹이 깨어 나면 할당량이 이미 만료/초과되지 않았는지 확인해야합니다.
+ * 그렇지 않으면 update_curr() 조절이 on-rq가 될 때까지 트리거 할 수 없으므로
+ * 런타임의 추가 틱을 도용 할 수 있습니다.
  */
 static void check_enqueue_throttle(struct cfs_rq *cfs_rq)
 {

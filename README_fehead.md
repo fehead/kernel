@@ -557,3 +557,15 @@ of_irq_init
 ```
 - check_cfs_rq_runtime
 - sched_cfs_period_timer
+
+
+### 2017.09.02
+#### 참고
+ - http://jake.dothome.co.kr/
+
+#### 진도
+- return_cfs_rq_runtime - __return_cfs_rq_runtime
+- do_sched_cfs_slack_timer
+- msleep -> schedule_timeout
+		
+

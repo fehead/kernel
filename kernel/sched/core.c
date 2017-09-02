@@ -940,6 +940,10 @@ static void enqueue_task(struct rq *rq, struct task_struct *p, int flags)
 	p->sched_class->enqueue_task(rq, p, flags);
 }
 
+/* IAMROOT-12 fehead (2017-09-02):
+ * --------------------------
+ * schedule() -> __schedule() -> deactivate_task(rq, prev, DEQUEUE_SLEEP)
+ */
 static void dequeue_task(struct rq *rq, struct task_struct *p, int flags)
 {
 	update_rq_clock(rq);
@@ -955,6 +959,10 @@ void activate_task(struct rq *rq, struct task_struct *p, int flags)
 	enqueue_task(rq, p, flags);
 }
 
+/* IAMROOT-12 fehead (2017-09-02):
+ * --------------------------
+ * deactivate_task(rq, prev, DEQUEUE_SLEEP);
+ */
 void deactivate_task(struct rq *rq, struct task_struct *p, int flags)
 {
 	if (task_contributes_to_load(p))
@@ -2934,6 +2942,45 @@ again:
  * accordingly in case an event triggered the need for rescheduling (such as
  * an interrupt waking up a task) while preemption was disabled in __schedule().
  */
+/* IAMROOT-12 fehead (2017-09-02):
+ * --------------------------
+ * __schedule()은 주요 스케줄러 함수입니다.
+ *
+ * 스케줄러를 구동하여이 기능을 입력하는 주요 방법은 다음과 같습니다.
+ *
+ * 1. 명시적 차단 : 뮤텍스, 세마포어, 대기 대기 등
+ *
+ * 2. TIF_NEED_RESCHED 플래그는 인터럽트 및 사용자 공간 반환 경로에서 검사됩니다
+ *   . 예를 들어 arch/x86/entry_64.S를 참조하십시오.
+ *
+ *    태스크간에 선점을 유도하기 위해 스케줄러는 타이머 인터럽트 핸들러
+ *    scheduler_tick()에 플래그를 설정합니다.
+ *
+ * 3. 웨이크 업이 실제로 schedule()에 들어가는 것은 아닙니다.
+ *   그들은 실행 대기열에 작업을 추가하고 그게 전부입니다.
+ *
+ *   이제 실행 대기열에 추가 된 새 작업이 현재 작업을 선점하면 웨이크 업이
+ *   TIF_NEED_RESCHED를 설정하고 schedule()이 가능한 가장 가까운 경우에 호출됩니
+ *   다.
+ *
+ *     - 커널이 선점 가능한 경우 (CONFIG_PREEMPT = y) :
+ *        - syscall 또는 예외 상황에서, 다음번에 preempt_enable().
+ *         (이것은 곧 wake_up()의 spin_unlock()만큼이나 될 것입니다!)
+ *
+ *	  - IRQ 컨텍스트에서 interrupt-handler에서 선점 가능한 컨텍스트로 복귀
+ *
+ *      - 커널이 선점되지 않는 경우 (CONFIG_PREEMPT가 설정되지 않은 경우) 다음에
+ *        다음을 수행하십시오.
+ *
+ *          - cond_resched () 호출
+ *          - 명시 적 schedule () 호출
+ *          - syscall 또는 예외에서 사용자 공간으로 복귀
+ *          - 인터럽트 처리기에서 사용자 공간으로 복귀
+ *
+ * 경고 : 모든 호출자는 이후에 need_resched()를 다시 확인해야하고 __schedule()
+ * 에서 선매가 비활성화되어있는 동안 이벤트가 재스케줄링 (예:작업 깨우기)을 트리
+ * 거 한 경우 그에 따라 일정을 다시 잡아야합니다.
+ */
 static void __sched __schedule(void)
 {
 	struct task_struct *prev, *next;
@@ -2963,6 +3010,10 @@ static void __sched __schedule(void)
 	rq->clock_skip_update <<= 1; /* promote REQ to ACT */
 
 	switch_count = &prev->nivcsw;
+	/* IAMROOT-12 fehead (2017-09-02):
+	 * --------------------------
+	 * schedule()함수에서 유일하게 PREEMPT_ACTIVE 없는 상태에서 호출됨
+	 */
 	if (prev->state && !(preempt_count() & PREEMPT_ACTIVE)) {
 		if (unlikely(signal_pending_state(prev->state, prev))) {
 			prev->state = TASK_RUNNING;

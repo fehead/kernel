@@ -337,6 +337,10 @@ static inline struct task_struct *task_of(struct sched_entity *se)
 }
 
 /* Walk up scheduling entities hierarchy */
+/* IAMROOT-12 fehead (2017-09-02):
+ * --------------------------
+ * 현재 sched entity 부터 루트 엔디티 바로 전까지.
+ */
 #define for_each_sched_entity(se) \
 		for (; se; se = se->parent)
 
@@ -3550,6 +3554,11 @@ static __always_inline void return_cfs_rq_runtime(struct cfs_rq *cfs_rq);
  * --------------------------
  * dequeue_entity(qcfs_rq, se, DEQUEUE_SLEEP);
  */
+/* IAMROOT-12 fehead (2017-09-02):
+ * --------------------------
+ * schedule() -> __schedule() -> deactivate_task(rq, prev, DEQUEUE_SLEEP)
+ * -> dequeue_task(..) -> ...
+ */
 static void
 dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 {
@@ -3708,11 +3717,19 @@ static int
 wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se);
 
 /*
- * Pick the next process, keeping these things in mind, in this order:
- * 1) keep things fair between processes/task groups
- * 2) pick the "next" process, since someone really wants that to run
- * 3) pick the "last" process, for cache locality
- * 4) do not run the "skip" process, if something else is available
+ Pick the next process, keeping these things in mind, in this order:
+ 1) keep things fair between processes/task groups
+ 2) pick the "next" process, since someone really wants that to run
+ 3) pick the "last" process, for cache locality
+ 4) do not run the "skip" process, if something else is available
+ */
+/* IAMROOT-12 fehead (2017-09-02):
+ * --------------------------
+ * 다음 순서를 염두에두고 다음 순서대로 선택하십시오.
+ * 1) 프로세스 / 작업 그룹간에 일을 공정하게 유지하십시오.
+ * 2) 누군가가 실제로 그것을 실행하기를 원하기 때문에 "다음"프로세스를 선택하십시오.
+ * 3) 캐시 지역에 대한 "마지막"프로세스 선택
+ * 4) 다른 것이 있으면 "건너 뛰기"프로세스를 실행하지 마십시오.
  */
 static struct sched_entity *
 pick_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr)
@@ -4705,6 +4722,11 @@ static void start_cfs_slack_bandwidth(struct cfs_bandwidth *cfs_b)
 }
 
 /* we know any runtime found here is valid as update_curr() precedes return */
+/* IAMROOT-12 fehead (2017-09-02):
+ * --------------------------
+ * 우리는 update_curr()이 리턴을 앞두고 있기 때문에 여기에있는 런타임이 유효하
+ * 다는 것을 알고 있습니다.
+ */
 static void __return_cfs_rq_runtime(struct cfs_rq *cfs_rq)
 {
 	struct cfs_bandwidth *cfs_b = tg_cfs_bandwidth(cfs_rq->tg);
@@ -5184,6 +5206,11 @@ static void set_next_buddy(struct sched_entity *se);
  * decreased. We remove the task from the rbtree and
  * update the fair scheduling stats:
  */
+/* IAMROOT-12 fehead (2017-09-02):
+ * --------------------------
+ * schedule() -> __schedule() -> deactivate_task(rq, prev, DEQUEUE_SLEEP)
+ * -> dequeue_task(..)
+ */
 static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct cfs_rq *cfs_rq;
@@ -5214,6 +5241,11 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 			/*
 			 * Bias pick_next to pick a task from this cfs_rq, as
 			 * p is sleeping when it is within its sched_slice.
+			 */
+			/* IAMROOT-12 fehead (2017-09-02):
+			 * --------------------------
+			 * Bias pick_next는 p가 sched_slice 내에있을 때이 cfs_rq
+			 * 에서 작업을 선택합니다.
 			 */
 			if (task_sleep && parent_entity(se))
 				set_next_buddy(parent_entity(se));

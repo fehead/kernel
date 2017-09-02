@@ -2124,6 +2124,10 @@ void __init init_timers(void)
  * msleep - sleep safely even with waitqueue interruptions
  * @msecs: Time in milliseconds to sleep for
  */
+/* IAMROOT-12 fehead (2017-09-02):
+ * --------------------------
+ * waitqueue interruptions에도 안전하게 잠을 자다.
+ */
 void msleep(unsigned int msecs)
 {
 	unsigned long timeout = msecs_to_jiffies(msecs) + 1;

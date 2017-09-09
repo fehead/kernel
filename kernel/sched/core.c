@@ -1842,6 +1842,10 @@ static void ttwu_queue(struct task_struct *p, int cpu)
  * Return: %true if @p was woken up, %false if it was already running.
  * or @state didn't match @p's state.
  */
+/* IAMROOT-12 fehead (2017-09-09):
+ * --------------------------
+ * return try_to_wake_up(p, TASK_NORMAL, 0);
+ */
 static int
 try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 {
@@ -1869,6 +1873,11 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 	/*
 	 * If the owning (remote) cpu is still in the middle of schedule() with
 	 * this task as prev, wait until its done referencing the task.
+	 */
+	/* IAMROOT-12 fehead (2017-09-09):
+	 * --------------------------
+	 * 소유하고있는(원격) cpu가이 작업을 prev로하여 schedule() 중간에 있다면
+	 * 작업 완료를 기다릴 때까지 기다리십시오.
 	 */
 	while (p->on_cpu)
 		cpu_relax();

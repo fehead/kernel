@@ -426,7 +426,12 @@ find_matching_se(struct sched_entity **se, struct sched_entity **pse)
 	 * both tasks until we find their ancestors who are siblings of common
 	 * parent.
 	 */
-
+	/* IAMROOT-12 fehead (2017-09-09):
+	 * --------------------------
+	 * 동일한 cfs_rq에 속한 즉 공통 부모를 가진 형제 엔티티간에 선점 테스트
+	 * 를 수행 할 수 있습니다. 공통 부모의 형제인 조상을 찾을 때까지 두 작업
+	 * 의 계층 구조를 따라 가십시오.
+	 */
 	/* First walk up until both entities are at same depth */
 	se_depth = (*se)->depth;
 	pse_depth = (*pse)->depth;
@@ -3451,6 +3456,12 @@ place_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int initial)
 	 * little, place the new task so that it fits in the slot that
 	 * stays open at the end.
 	 */
+	/* IAMROOT-12 fehead (2017-09-09):
+	 * --------------------------
+	 * 'current' 기간은 현재 작업에 이미 약속되어 있지만 새로운 작업의 추가
+	 * 중량으로 인해 작업 속도가 느려지므로 새 작업을 배치하여 끝에 열린 슬
+	 * 롯에 맞춥니다.
+	 */
 	if (initial && sched_feat(START_DEBIT))
 		vruntime += sched_vslice(cfs_rq, se);
 
@@ -3480,6 +3491,11 @@ enqueue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	/*
 	 * Update the normalized vruntime before updating min_vruntime
 	 * through calling update_curr().
+	 */
+	/* IAMROOT-12 fehead (2017-09-09):
+	 * --------------------------
+	 * update_curr() 호출을 통해 min_vruntime을 업데이트하기 전에 정규화 된
+	 * vruntime을 업데이트하십시오.
 	 */
 	if (!(flags & ENQUEUE_WAKEUP) || (flags & ENQUEUE_WAKING))
 		se->vruntime += cfs_rq->min_vruntime;
@@ -5504,6 +5520,11 @@ static void record_wakee(struct task_struct *p)
 	 * about the boundary, really active task won't care
 	 * about the loss.
 	 */
+	/* IAMROOT-12 fehead (2017-09-09):
+	 * --------------------------
+	 * 거친 붕괴 (닦음) 비용 절감을 위해, 경계에 대해 걱정하지 마십시오, 정
+	 * 말 적극적인 작업은 손실에 대해 상관하지 않습니다.
+	 */
 	if (time_after(jiffies, current->wakee_flip_decay_ts + HZ)) {
 		current->wakee_flips >>= 1;
 		current->wakee_flip_decay_ts = jiffies;
@@ -6036,6 +6057,24 @@ wakeup_gran(struct sched_entity *curr, struct sched_entity *se)
 	 *
 	 * This is especially important for buddies when the leftmost
 	 * task is higher priority than the buddy.
+	 */
+	/* IAMROOT-12 fehead (2017-09-09):
+	 * --------------------------
+	 * 현재 실행중인 curr 이후로 자신의 단위로 실시간을 가상 시간으로 변환하십시오.
+	 *
+	 * 'curr'대신 'se'를 사용하여 가벼운 task에 불이익을 주므로 더 쉽게 선점
+	 * 당합니다. 즉 'se'< 'curr'이면 결과 gran이 더 클 것이므로 반면에
+	 * 'se'> 'curr'이라면 라이터에 불이익을 주며 그 결과 gran은 작아지고
+	 * 가벼운 작업에 다시 불이익을줍니다.
+	 *
+	 * 이는 가장 왼쪽 작업이 buddy보다 우선 순위가 높은 buddy에게 특히 중요합니다.
+	 */
+	/* IAMROOT-12 fehead (2017-09-09):
+	 * --------------------------
+	 * se.weight가 크면(NICE가 -20에 가까우면 가까울수록) calc_delta_fair()
+	 *	반환값은 작아진다.
+	 * se.weight가 작으면(NICE가 20에 가까우면 가까울수록) calc_delta_fair()
+	 *	반환값은 커진다.
 	 */
 	return calc_delta_fair(gran, se);
 }

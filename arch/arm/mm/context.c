@@ -237,6 +237,13 @@ void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk)
 	 * MMU, so switch exclusively to global mappings to avoid
 	 * speculative page table walking with the wrong TTBR.
 	 */
+	/* IAMROOT-12 fehead (2017-09-16):
+	 * --------------------------
+	 * 우리는 pgd와 ASID(Address Space Identifier 주소공간 식별자)를 고전적
+	 * 인 MMU로 원자적으로 업데이트 할 수 없기 때문에 그릇된 TTBR로 위험한
+	 * 페이지 테이블 워킹을 피하기 위해 글로벌 매핑으로 배타적으로 전환합니
+	 * 다.
+	 */
 	cpu_set_reserved_ttbr0();
 
 	asid = atomic64_read(&mm->context.id);
@@ -262,5 +269,9 @@ void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk)
 	raw_spin_unlock_irqrestore(&cpu_asid_lock, flags);
 
 switch_mm_fastpath:
+	/* IAMROOT-12 fehead (2017-09-16):
+	 * --------------------------
+	 * pi2 : cpu_v7_switch_mm 호출됨.
+	 */
 	cpu_switch_mm(mm->pgd, mm);
 }

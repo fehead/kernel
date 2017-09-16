@@ -3906,10 +3906,17 @@ wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se);
 /* IAMROOT-12 fehead (2017-09-02):
  * --------------------------
  * 다음 순서를 염두에두고 다음 순서대로 선택하십시오.
- * 1) 프로세스 / 작업 그룹간에 일을 공정하게 유지하십시오.
- * 2) 누군가가 실제로 그것을 실행하기를 원하기 때문에 "다음"프로세스를 선택하십시오.
- * 3) 캐시 지역에 대한 "마지막"프로세스 선택
- * 4) 다른 것이 있으면 "건너 뛰기"프로세스를 실행하지 마십시오.
+ * 1) 프로세스/작업 그룹간에 일을 공정하게 유지하십시오.(wakeup_preempt_entity
+ *    함수에서 vruntime으로 그나마 공정하게 유지)
+ * 2) 누군가가 실제로 그것을 실행하기를 원하기 때문에 "next"프로세스를 선택하십시오.
+ * 3) 캐시 지역에 대한 "last"프로세스 선택
+ * 4) 다른 것이 있으면 "skip"프로세스를 실행하지 마십시오.
+ */
+/* IAMROOT-12 fehead (2017-09-16):
+ * --------------------------
+ * cfs_rq 의 sched_entity중
+ * cfs_rq->next, cfs_rq->last, vruntime이 가장 작은것, skip buddy 일때는
+ * vruntime 순서중 2번째(second) 것을 선택한다.
  */
 static struct sched_entity *
 pick_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr)
@@ -3940,8 +3947,17 @@ pick_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 	 * be done without getting too unfair.
 	 */
 	if (cfs_rq->skip == se) {
+		/* IAMROOT-12 fehead (2017-09-16):
+		 * --------------------------
+		 * cfs_rq에서 curr, rb tree중에 vruntime 순서대로 2번째가
+		 * second가 된다.
+		 */
 		struct sched_entity *second;
 
+		/* IAMROOT-12 fehead (2017-09-16):
+		 * --------------------------
+		 * se == curr: curr 밖에 없거나 curr vruntime이 leftmost보다 작을때
+		 */
 		if (se == curr) {
 			second = __pick_first_entity(cfs_rq);
 		} else {
@@ -3957,6 +3973,16 @@ pick_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 	/*
 	 * Prefer last buddy, try to return the CPU to a preempted task.
 	 */
+	/* IAMROOT-12 fehead (2017-09-16):
+	 * --------------------------
+	 * NICE0일경우 반환값(last == curr, left == se)
+	 *  1  : se_vruntime < (curr_vruntime - 1ms)
+	 *  0  : (curr_vruntime - 1ms) <= se_vruntime < curr_vruntime
+	 *  -1 : curr_vruntime <= se_vruntime
+	 *
+	 * left_vruntime가 너무 앞에 있는경우(NICE0: last - 1ms 미만)를 제외하고
+	 * 는 se에 last를 대입.
+	 */
 	if (cfs_rq->last && wakeup_preempt_entity(cfs_rq->last, left) < 1)
 		se = cfs_rq->last;
 
@@ -3968,6 +3994,12 @@ pick_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 
 	clear_buddies(cfs_rq, se);
 
+	/* IAMROOT-12 fehead (2017-09-16):
+	 * --------------------------
+	 * cfs_rq 의 sched_entity중
+	 * cfs_rq->next, cfs_rq->last, vruntime이 가장 작은것, skip buddy 일때는
+	 * vruntime 순서중 2번째(second) 것을 선택한다.
+	 */
 	return se;
 }
 
@@ -6185,6 +6217,13 @@ migrate_task_rq_fair(struct task_struct *p, int next_cpu)
 }
 #endif /* CONFIG_SMP */
 
+/* IAMROOT-12 fehead (2017-09-16):
+ * --------------------------
+ * NICE0일경우 1ms
+ * se의 우선순위가 높을 수록 wakeup_gran 값은 작아진다.
+ * 예) se->load.weigiht=2048, curr->load.weight=1024, gran=1ms 
+ *     -> wakeup_gran() = 0.33ms 
+ */
 static unsigned long
 wakeup_gran(struct sched_entity *curr, struct sched_entity *se)
 {
@@ -6254,6 +6293,13 @@ wakeup_gran(struct sched_entity *curr, struct sched_entity *se)
  *  w(c, s3) =  1
  *
  */
+/* IAMROOT-12 fehead (2017-09-16):
+ * --------------------------
+ * NICE0일경우 반환값
+ *  1  : se_vruntime < (curr_vruntime - 1ms)
+ *  0  : (curr_vruntime - 1ms) <= se_vruntime < curr_vruntime
+ *  -1 : curr_vruntime <= se_vruntime
+ */
 static int
 wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
 {
@@ -6283,6 +6329,10 @@ wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
 	if (vdiff <= 0)
 		return -1;
 
+/* IAMROOT-12 fehead (2017-09-16):
+ * --------------------------
+ * NICE0 일경우 1ms 시간 간격을 얻는다.
+ */
 	gran = wakeup_gran(curr, se);
 
 /* IAMROOT-12:
@@ -6488,6 +6538,14 @@ again:
 	 * Therefore attempt to avoid putting and setting the entire cgroup
 	 * hierarchy, only change the part that actually changes.
 	 */
+	/* IAMROOT-12 fehead (2017-09-16):
+	 * --------------------------
+	 * dequeue_task_fair()의 set_next_buddy()로 인해 다음 작업이 현재와 동일
+	 * 한 cgroup에있을 가능성이 높습니다.
+	 *
+	 * 따라서 전체 cgroup 계층을 배치 및 설정하지 않으려고 실제로 변경되는
+	 * 부분 만 변경하십시오.
+	 */
 
 	do {
 		struct sched_entity *curr = cfs_rq->curr;
@@ -6497,6 +6555,13 @@ again:
 		 * have to consider cfs_rq->curr. If it is still a runnable
 		 * entity, update_curr() will update its vruntime, otherwise
 		 * forget we've ever seen it.
+		 */
+		/* IAMROOT-12 fehead (2017-09-16):
+		 * --------------------------
+		 * put_prev_entity()를 수행하지 않고 여기에 왔으므로
+		 * cfs_rq->curr도 고려해야합니다. 실행 가능한 엔티티인 경우
+		 * update_curr()은 vruntime을 업데이트합니다.
+		 * 그렇지 않으면 지금까지 본 적이 없다는 것을 잊어 버리십시오.
 		 */
 		if (curr && curr->on_rq)
 			update_curr(cfs_rq);
@@ -6521,6 +6586,11 @@ again:
 	 * Since we haven't yet done put_prev_entity and if the selected task
 	 * is a different task than we started out with, try and touch the
 	 * least amount of cfs_rqs.
+	 */
+	/* IAMROOT-12 fehead (2017-09-16):
+	 * --------------------------
+	 * put_prev_entity를 아직 수행하지 않았으므로 선택한 task가 처음 시작한
+	 * 작업과 다른 경우 cfs_rqs를 최소화하고 시도하십시오.
 	 */
 	if (prev != p) {
 		struct sched_entity *pse = &prev->se;
@@ -6547,6 +6617,11 @@ again:
 		hrtick_start_fair(rq, p);
 
 	return p;
+
+/* IAMROOT-12 fehead (2017-09-16):
+ * --------------------------
+ * simple 라벨은 어떠한 계산없이 다음 sched_entity의 task를 가져온다.
+ */
 simple:
 	cfs_rq = &rq->cfs;
 #endif
@@ -6556,6 +6631,10 @@ simple:
 
 	put_prev_task(rq, prev);
 
+	/* IAMROOT-12 fehead (2017-09-16):
+	 * --------------------------
+	 * 다음 entry 혹은 다음 그룹의 최하단 entry를 가져옴.
+	 */
 	do {
 		se = pick_next_entity(cfs_rq, NULL);
 		set_next_entity(cfs_rq, se);

@@ -3009,6 +3009,10 @@ pick_next_task(struct rq *rq, struct task_struct *prev)
 	 */
 	if (likely(prev->sched_class == class &&
 		   rq->nr_running == rq->cfs.h_nr_running)) {
+		/* IAMROOT-12 fehead (2017-09-16):
+		 * --------------------------
+		 * pick_next_task_fair
+		 */
 		p = fair_sched_class.pick_next_task(rq, prev);
 		if (unlikely(p == RETRY_TASK))
 			goto again;
@@ -3078,9 +3082,9 @@ again:
  * --------------------------
  * __schedule()은 주요 스케줄러 함수입니다.
  *
- * 스케줄러를 구동하여이 기능을 입력하는 주요 방법은 다음과 같습니다.
+ * 스케줄러를 구동하여 이 함수를을 들어오는 주요 방법은 다음과 같습니다.
  *
- * 1. 명시적 차단 : 뮤텍스, 세마포어, 대기 대기 등
+ * 1. 명시적(Explicit) blocking: 뮤텍스, 세마포어, waitqueue 등
  *
  * 2. TIF_NEED_RESCHED 플래그는 인터럽트 및 사용자 공간 반환 경로에서 검사됩니다
  *   . 예를 들어 arch/x86/entry_64.S를 참조하십시오.
@@ -3089,14 +3093,14 @@ again:
  *    scheduler_tick()에 플래그를 설정합니다.
  *
  * 3. 웨이크 업이 실제로 schedule()에 들어가는 것은 아닙니다.
- *   그들은 실행 대기열에 작업을 추가하고 그게 전부입니다.
+ *   그들은 run_queue에 작업을 추가하고 그게 전부입니다.
  *
- *   이제 실행 대기열에 추가 된 새 작업이 현재 작업을 선점하면 웨이크 업이
+ *   이제 run-queue에 추가 된 새 작업이 현재 작업을 선점하면 웨이크 업이
  *   TIF_NEED_RESCHED를 설정하고 schedule()이 가능한 가장 가까운 경우에 호출됩니
  *   다.
  *
- *     - 커널이 선점 가능한 경우 (CONFIG_PREEMPT = y) :
- *        - syscall 또는 예외 상황에서, 다음번에 preempt_enable().
+ *     - 커널이 선점 가능한 경우 (CONFIG_PREEMPT=y):
+ *        - syscall 또는 예외 context에서, 다음번에 preempt_enable().
  *         (이것은 곧 wake_up()의 spin_unlock()만큼이나 될 것입니다!)
  *
  *	  - IRQ 컨텍스트에서 interrupt-handler에서 선점 가능한 컨텍스트로 복귀
@@ -3106,8 +3110,8 @@ again:
  *
  *          - cond_resched () 호출
  *          - 명시 적 schedule () 호출
- *          - syscall 또는 예외에서 사용자 공간으로 복귀
- *          - 인터럽트 처리기에서 사용자 공간으로 복귀
+ *          - syscall 또는 예외에서 user-space으로 복귀
+ *          - interrupt-handler에서 user-space으로 복귀
  *
  * 경고 : 모든 호출자는 이후에 need_resched()를 다시 확인해야하고 __schedule()
  * 에서 선매가 비활성화되어있는 동안 이벤트가 재스케줄링 (예:작업 깨우기)을 트리

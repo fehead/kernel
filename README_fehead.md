@@ -569,3 +569,11 @@ of_irq_init
 - msleep -> schedule_timeout
 		
 
+### 2017.09.16
+#### 참고
+ - http://jake.dothome.co.kr/
+
+#### 진도
+- ttwu_queue -> ttwu_do_activate -> ttwu_do_wakeup
+- ttwu_queue_remote
+- context_switch

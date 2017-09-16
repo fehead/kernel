@@ -13,6 +13,10 @@
 #define INIT_MM_CONTEXT(name)
 #endif
 
+/* IAMROOT-12 fehead (2017-09-16):
+ * --------------------------
+ * kernel용 mm
+ */
 struct mm_struct init_mm = {
 	.mm_rb		= RB_ROOT,
 	.pgd		= swapper_pg_dir,

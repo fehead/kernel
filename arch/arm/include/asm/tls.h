@@ -43,6 +43,10 @@
 #define has_tls_reg		(elf_hwcap & HWCAP_TLS)
 #define switch_tls	switch_tls_v6
 #elif defined(CONFIG_CPU_32v6K)
+/* IAMROOT-12 fehead (2017-09-23):
+ * --------------------------
+ * pi2 에서는 아래를 쓴다.
+ */
 #define tls_emu		0
 #define has_tls_reg		1
 #define switch_tls	switch_tls_v6k

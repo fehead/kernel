@@ -667,6 +667,10 @@ struct rq {
 
 	struct task_struct *curr, *idle, *stop;
 	unsigned long next_balance;
+	/* IAMROOT-12 fehead (2017-09-23):
+	 * --------------------------
+	 * prev_mm = prev->active_mm;
+	 */
 	struct mm_struct *prev_mm;
 
 	unsigned int clock_skip_update;

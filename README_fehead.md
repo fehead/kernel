@@ -577,3 +577,13 @@ of_irq_init
 - ttwu_queue -> ttwu_do_activate -> ttwu_do_wakeup
 - ttwu_queue_remote
 - context_switch
+
+
+### 2017.09.23
+#### 참고
+ - http://jake.dothome.co.kr/preemption
+
+#### 진도
+- switch_mm
+- new_context
+- __irq_usr -> do_work_pending

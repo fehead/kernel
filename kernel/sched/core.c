@@ -2593,6 +2593,25 @@ prepare_task_switch(struct rq *rq, struct task_struct *prev,
  * past. prev == current is still correct but we need to recalculate this_rq
  * because prev may have moved to another CPU.
  */
+/* IAMROOT-12 fehead (2017-09-23):
+ * --------------------------
+ * finish_task_switch - 작업 전환 후 정리
+ * @prev : 우리가 막 바꾼 스레드.
+ *
+ * finish_task_switch는 컨텍스트 전환 후 쌍으로 호출되어야합니다
+ * 컨텍스트 전환 전에 prepare_task_switch 호출을 사용하십시오.
+ * finish_task_switch는 prepare_task_switch에 의한 잠금 설정을 조정합니다.
+ * 다른 아키텍처 별 정리 작업을 수행합니다.
+ *
+ * context_switch()에서 mm이 떨어지는 것을 지연 시켰을 수도 있습니다. 그렇다면,
+ * 우리는 여기 runqueue 잠금 장치 밖에서 마무리합니다. (잠금을 유지 한 상태에서
+ * 교착 상태가 발생할 수 있으므로 자세한 내용은 schedule()을 참조하십시오.)
+ *
+ * 컨텍스트 스위치는 우리 밑에서 스택을 뒤집어 과거에이 태스크가 schedule()을
+ * 호출했을 때 저장된 로컬 변수를 복원했습니다. prev와 current 같은 경우는 여전
+ * 히 정확하지만 prev가 다른 CPU로 이동할 수 있으므로 this_rq를 다시 계산해야합
+ * 니다.
+ */
 static struct rq *finish_task_switch(struct task_struct *prev)
 	__releases(rq->lock)
 {
@@ -2613,6 +2632,17 @@ static struct rq *finish_task_switch(struct task_struct *prev)
 	 * be dropped twice.
 	 *		Manfred Spraul <manfred@colorfullife.com>
 	 */
+	/* IAMROOT-12 fehead (2017-09-23):
+	 * --------------------------
+	 * 태스크 구조체에는 "current"로 사용하기위한 하나의 참조가 있습니다.
+	 * 태스크가 종료되면 tsk->state에 TASK_DEAD를 설정하고 마지막으로 스케줄
+	 * 을 호출합니다. 일정 호출은 결코 반환되지 않으며 예약 된 작업은 해당
+	 * 참조를 삭제해야합니다.
+	 * TASK_DEAD에 대한 테스트는 실행 대기열 잠금이 유지되는 동안 발생해야합
+	 * 니다. 그렇지 않으면 prev가 다른 CPU에서 예약되고 prev->state를 보기
+	 * 전에 죽은 다음 참조가 두 번 삭제됩니다.
+	 *		Manfred Spraul <manfred@colorfullife.com>
+	 */
 	prev_state = prev->state;
 	vtime_task_switch(prev);
 	finish_arch_switch(prev);
@@ -2623,6 +2653,10 @@ static struct rq *finish_task_switch(struct task_struct *prev)
 	fire_sched_in_preempt_notifiers(current);
 	if (mm)
 		mmdrop(mm);
+	/* IAMROOT-12 fehead (2017-09-23):
+	 * --------------------------
+	 * TASK_DEAD -> do_exit() 에서 설정
+	 */
 	if (unlikely(prev_state == TASK_DEAD)) {
 		if (prev->sched_class->task_dead)
 			prev->sched_class->task_dead(prev);
@@ -2630,6 +2664,11 @@ static struct rq *finish_task_switch(struct task_struct *prev)
 		/*
 		 * Remove function-return probe instances associated with this
 		 * task and put them back on the free list.
+		 */
+		/* IAMROOT-12 fehead (2017-09-23):
+		 * --------------------------
+		 * 이 태스크와 연관된 함수 리턴 프로브 인스턴스를 제거하고 다시
+		 * 빈리스트에 놓습니다.
 		 */
 		kprobe_flush_task(prev);
 		put_task_struct(prev);
@@ -2742,7 +2781,17 @@ context_switch(struct rq *rq, struct task_struct *prev,
 
 	context_tracking_task_switch(prev, next);
 	/* Here we just switch the register state and the stack. */
+	/* IAMROOT-12 fehead (2017-09-23):
+	 * --------------------------
+	 * prev = __switch_to(prev,task_thread_info(prev), task_thread_info(next));
+	 *
+	 * 여기까지는 prev는 'current' task이다.
+	 */
 	switch_to(prev, next, prev);
+	/* IAMROOT-12 fehead (2017-09-23):
+	 * --------------------------
+	 * 여기서는 prev는 'current' task가 아니라 진짜 switch_to 이전 task이다.
+	 */
 	barrier();
 
 	return finish_task_switch(prev);

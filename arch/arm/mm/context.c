@@ -212,6 +212,15 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
 	 * overlapping level-1 descriptors used to map both the module
 	 * area and the userspace stack.
 	 */
+	/* IAMROOT-12 fehead (2017-09-23):
+	 * --------------------------
+	 * 무료 ASID를 할당하십시오. TLB를 찾을 수 없으면 현재 활성화 된 ASID를
+	 * 메모하고 플러시가 필요한 TLB로 표시하십시오. ASID #0은 TTBR0을 통해
+	 * 전환하고, 모듈 영역을 매핑하는데 사용되는 중복되는 레벨-1 설명 자로
+	 * 채워질 수있는 부분 워크 캐시에서 타격을 피하기 위해 투기 페이지 테이
+	 * 블 워크가 발생하지 않도록 항상 ASID #1에서부터 계산됩니다 및 사용자
+	 * 공간 스택.
+	 */
 	asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, cur_idx);
 	if (asid == NUM_USER_ASIDS) {
 		generation = atomic64_add_return(ASID_FIRST_VERSION,

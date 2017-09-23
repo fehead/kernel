@@ -921,6 +921,10 @@ ENDPROC(__fiq_usr)
  * r0 = previous task_struct, r1 = previous thread_info, r2 = next thread_info
  * previous and next are guaranteed not to be the same.
  */
+/* IAMROOT-12 fehead (2017-09-23):
+ * --------------------------
+ * last = __switch_to(prev,task_thread_info(prev), task_thread_info(next));	\
+ */
 ENTRY(__switch_to)
  UNWIND(.fnstart	)
  UNWIND(.cantunwind	)
@@ -929,11 +933,19 @@ ENTRY(__switch_to)
  THUMB(	stmia	ip!, {r4 - sl, fp}	   )	@ Store most regs on stack
  THUMB(	str	sp, [ip], #4		   )
  THUMB(	str	lr, [ip], #4		   )
+/* IAMROOT-12 fehead (2017-09-23):
+ * --------------------------
+ * next thread_info -> tp_value (TLS registers)
+ */
 	ldr	r4, [r2, #TI_TP_VALUE]
 	ldr	r5, [r2, #TI_TP_VALUE + 4]
 #ifdef CONFIG_CPU_USE_DOMAINS
 	ldr	r6, [r2, #TI_CPU_DOMAIN]
 #endif
+/* IAMROOT-12 fehead (2017-09-23):
+ * --------------------------
+ .macro switch_tls_v6k, base, tp, tpuser, tmp1, tmp2
+ */
 	switch_tls r1, r4, r5, r3, r7
 #if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
 	ldr	r7, [r2, #TI_TASK]

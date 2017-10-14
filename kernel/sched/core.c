@@ -2650,6 +2650,18 @@ static struct rq *finish_task_switch(struct task_struct *prev)
 	finish_lock_switch(rq, prev);
 	finish_arch_post_lock_switch();
 
+/* IAMROOT-12:
+ * -------------
+ * 태스크 전환이 완료되는 시점에서 prev는 기존 태스크이고 current는 현재 
+ * thread_info()이다. 단 cpu가 바뀐 경우 즉 런큐가 바뀐 경우 prev가 
+ * 있을 수 없게된다. 이러한 경우 prev와 current는 같을 수도 있다.
+ *
+ * preemption이 끝난 직후 preempt notifier block에 등록된 callback들을 
+ * 호출한다.
+ *
+ * kvm 등 하이퍼바이저를 지원하기 위해 preempt_notifier_register() 함수를 
+ * 통해 등록한다.
+ */
 	fire_sched_in_preempt_notifiers(current);
 	if (mm)
 		mmdrop(mm);
@@ -2658,6 +2670,12 @@ static struct rq *finish_task_switch(struct task_struct *prev)
 	 * TASK_DEAD -> do_exit() 에서 설정
 	 */
 	if (unlikely(prev_state == TASK_DEAD)) {
+
+/* IAMROOT-12:
+ * -------------
+ * dl 태스크에서 bandwidth에 대한 마무리를 수행시킨다. 
+ *	task_dead_dl()
+ */
 		if (prev->sched_class->task_dead)
 			prev->sched_class->task_dead(prev);
 
@@ -2674,6 +2692,10 @@ static struct rq *finish_task_switch(struct task_struct *prev)
 		put_task_struct(prev);
 	}
 
+/* IAMROOT-12:
+ * -------------
+ * nohz full 전환 체크
+ */
 	tick_nohz_task_switch(current);
 	return rq;
 }
@@ -2787,11 +2809,23 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	 *
 	 * 여기까지는 prev는 'current' task이다.
 	 */
+/* IAMROOT-12:
+ * -------------
+ * 세 번째 인수가 출력 인수로 사용된다.
+ *
+ * 대부분의 레지스터가 기존 상태에 있던 것을 복구해오기 때문에 
+ * scrach될 수 있다. 따라서 prev를 계속 보존하기 위해 사용한다.
+ */
 	switch_to(prev, next, prev);
 	/* IAMROOT-12 fehead (2017-09-23):
 	 * --------------------------
 	 * 여기서는 prev는 'current' task가 아니라 진짜 switch_to 이전 task이다.
 	 */
+
+/* IAMROOT-12:
+ * -------------
+ * 복귀되면 여기서 부터 실행된다.
+ */
 	barrier();
 
 	return finish_task_switch(prev);

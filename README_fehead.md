@@ -587,3 +587,13 @@ of_irq_init
 - switch_mm
 - new_context
 - __irq_usr -> do_work_pending
+
+
+### 2017.10.14
+#### 참고
+ - http://jake.dothome.co.kr/rt-scheduler/
+
+#### 진도
+- task_tick_rt
+- update_curr_rt
+- enqueue_task_rt
